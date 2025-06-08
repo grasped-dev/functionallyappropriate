@@ -332,7 +332,7 @@ const CreateReportPage: React.FC = () => {
     },
     {
       title: 'Referral & Background',
-      icon: <FileText className="text-gold" size={20} />,
+      icon: <FileText className="text-gold\" size={20} />,
       fields: ['reasonForReferral', 'backgroundInformation']
     },
     {
@@ -342,7 +342,7 @@ const CreateReportPage: React.FC = () => {
     },
     {
       title: 'Summary & Recommendations',
-      icon: <Target className="text-gold" size={20} />,
+      icon: <Target className="text-gold\" size={20} />,
       fields: ['summaryFindings', 'recommendations']
     }
   ];
@@ -463,7 +463,7 @@ const CreateReportPage: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           {/* Custom Template Form */}
           {isCustomTemplate && (
-            <div className="space-y-6 animate-fadeIn" id="substep-custom-template-fields">
+            <div className="space-y-6 animate-fadeIn\" id="substep-custom-template-fields">
               <div className="card">
                 <h3 className="text-xl font-semibold mb-4 text-gold">
                   Fill in Details for: {customName || 'Your Custom Template'}
