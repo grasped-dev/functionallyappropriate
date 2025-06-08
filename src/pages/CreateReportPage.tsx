@@ -724,7 +724,7 @@ const CreateReportPage: React.FC = () => {
                         setSelectedCategoryId(category.categoryId);
                         clearDraft();
                       }}
-                      className="text-left p-6 border border-border rounded-lg hover:border-gold hover:shadow-lg transition-all group bg-bg-primary"
+                      className="text-left p-6 border border-border rounded-lg hover:border-gold hover:shadow-lg transition-all group bg-bg-secondary"
                     >
                       <div className="flex items-center gap-3 mb-3">
                         {category.icon && <category.icon className="text-gold group-hover:scale-110 transition-transform\" size={28} />}
@@ -755,44 +755,6 @@ const CreateReportPage: React.FC = () => {
               </>
             )}
 
-            {/* Sub-Template Selection UI */}
-            {selectedCategoryId && !selectedTemplateId && !currentAction && (
-              <>
-                <div className="flex items-center mb-6">
-                  <button 
-                    onClick={() => setSelectedCategoryId(null)} 
-                    className="btn border border-border hover:bg-bg-secondary mr-4 flex items-center gap-1"
-                  >
-                    <ArrowLeft size={16}/> Back to Categories
-                  </button>
-                  <h2 className="text-xl font-medium">
-                    Choose from: {templateCategories.find(c => c.categoryId === selectedCategoryId)?.categoryName || 'Category'}
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {templateCategories.find(c => c.categoryId === selectedCategoryId)?.subTemplates.map((subTemplate) => (
-                    <button
-                      key={subTemplate.id}
-                      onClick={() => {
-                        // When a specific sub-template is chosen, update URL and proceed
-                        setSearchParams({ template: subTemplate.id });
-                        setSelectedTemplateId(subTemplate.id); // Also set state directly
-                        setCurrentStep(2); // Move to form filling
-                        clearDraft(); // Clear any previous category-level draft
-                      }}
-                      className="text-left p-5 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary"
-                    >
-                      <h4 className="font-semibold text-md text-text-primary mb-1">{subTemplate.name}</h4>
-                      <p className="text-xs text-text-secondary line-clamp-2">{subTemplate.description}</p>
-                      <div className="mt-3 flex items-center text-gold text-xs font-medium">
-                          <span>Use this Specific Template</span>
-                          <ArrowRight size={14} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
             {/* Upload UI */}
             {currentAction === 'upload' && (
               <div className="animate-fadeIn">
@@ -868,14 +830,6 @@ const CreateReportPage: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Directly Selected Template via URL */}
-            {selectedTemplateId && !currentAction && !selectedCategoryId && (
-              <div className="text-center p-6">
-                <p className="text-text-secondary mb-4">Loading template...</p>
-                {/* useEffect will handle moving to step 2 */}
               </div>
             )}
           </div>
