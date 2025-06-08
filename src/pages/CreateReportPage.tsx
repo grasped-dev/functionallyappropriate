@@ -727,7 +727,7 @@ const CreateReportPage: React.FC = () => {
                       className="text-left p-6 border border-border rounded-lg hover:border-gold hover:shadow-lg transition-all group bg-bg-secondary"
                     >
                       <div className="flex items-center gap-3 mb-3">
-                        {category.icon && <category.icon className="text-gold group-hover:scale-110 transition-transform" size={28} />}
+                        {category.icon && <category.icon className="text-gold group-hover:scale-110 transition-transform\" size={28} />}
                         <h3 className="font-semibold text-lg text-text-primary">{category.categoryName}</h3>
                       </div>
                       <p className="text-sm text-text-secondary mb-4">{category.categoryDescription}</p>
