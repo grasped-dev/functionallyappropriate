@@ -52,8 +52,9 @@ const CreateReportPage: React.FC = () => {
   const { addReport } = useReports();
   
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [currentSubStep, setCurrentSubStep] = useState<number>(1);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({});
   const [generatedReport, setGeneratedReport] = useState<string>('');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -97,6 +98,33 @@ const CreateReportPage: React.FC = () => {
       created_at: '2025-01-01T00:00:00Z'
     }
   ]);
+
+  // WJIV Standard Battery configuration
+  const standardSubtestsConfig = [
+    { id: 'letter_word', name: '1. Letter-Word Identification' }, { id: 'applied_problems', name: '2. Applied Problems' },
+    { id: 'spelling', name: '3. Spelling' }, { id: 'passage_comp', name: '4. Passage Comprehension' },
+    { id: 'calculation', name: '5. Calculation' }, { id: 'writing_samples', name: '6. Writing Samples' },
+    { id: 'word_attack', name: '7. Word Attack' }, { id: 'oral_reading', name: '8. Oral Reading' },
+    { id: 'sent_read_flu', name: '9. Sentence Reading Fluency' }, { id: 'math_facts_flu', name: '10. Math Facts Fluency' },
+    { id: 'sent_write_flu', name: '11. Sentence Writing Fluency' }
+  ];
+  // WJIV Extended Battery configuration
+  const extendedSubtestsConfig = [
+    { id: 'read_recall', name: '12. Reading Recall' }, { id: 'num_matrices', name: '13. Number Matrices' },
+    { id: 'editing', name: '14. Editing' }, { id: 'word_read_flu', name: '15. Word Reading Fluency' },
+    { id: 'spell_sounds', name: '16. Spelling of Sounds' }, { id: 'read_vocab', name: '17. Reading Vocabulary' },
+    { id: 'science', name: '18. Science' }, { id: 'social_studies', name: '19. Social Studies' },
+    { id: 'humanities', name: '20. Humanities' }
+  ];
+
+  // Define the structure for WJIV sub-steps (used for titles and field grouping)
+  const wjivSubStepsConfig = [
+    { title: "Student Information", fields: ['studentName', 'dob', 'doe', 'grade', 'examiner'] },
+    { title: "Background & Referral", fields: ['reasonForReferral', 'backgroundInfo', 'assessmentInstruments', 'behavioralObservations'] },
+    { title: "WJIV Clusters", fields: ['wj_broad_ss', 'wj_broad_pr', 'wj_broad_range', 'wj_reading_ss', 'wj_reading_pr', 'wj_reading_range', 'wj_written_ss', 'wj_written_pr', 'wj_written_range', 'wj_math_ss', 'wj_math_pr', 'wj_math_range'] },
+    { title: "WJIV Standard & Extended Subtests", fields: [ /* This sub-step will render standardSubtestsConfig and conditionally extendedSubtestsConfig */ ] },
+    { title: "Narratives & Recommendations", fields: ['narrativeInterpretation', 'summaryOfFindings', 'recommendations'] }
+  ];
 
   const [subTemplates] = useState<SubTemplate[]>([
     {
@@ -229,49 +257,29 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
       setFormData(initialCustomFormData);
     } else if (templateParam && templateCategories.length > 0) {
       // Predefined template flow
-      for (const category of templateCategories) {
-        const subTemplate = subTemplates.find(st => 
+      for (const category of templateCategories) { // category is TemplateCategory here
+        const subTemplate = subTemplates.find(st => // st is SubTemplate here
           st.category_table_id === category.id && st.sub_template_id === templateParam
         );
         
         if (subTemplate) {
           setSelectedTemplateId(subTemplate.sub_template_id);
-          setSelectedCategoryId(category.category_id);
+          setSelectedCategoryId(category.category_id); // Use category_id (string)
           setCurrentStep(2);
           
-          // Updated FormData initialization logic
-          const newInitialFormData: FormData = { 
-            // Ensure essential common fields are initialized if not in placeholders
-            studentName: formData.studentName || '', 
-            dob: formData.dob || '', 
-            doe: formData.doe || '',
-            grade: formData.grade || '',
-            examiner: formData.examiner || '',
-            reasonForReferral: formData.reasonForReferral || '',
-            backgroundInfo: formData.backgroundInfo || '',
-            assessmentInstruments: formData.assessmentInstruments || '',
-            behavioralObservations: formData.behavioralObservations || '',
-            includeExtendedBattery: typeof formData.includeExtendedBattery === 'boolean' ? formData.includeExtendedBattery : false,
-            narrativeInterpretation: formData.narrativeInterpretation || '',
-            summaryOfFindings: formData.summaryOfFindings || '',
-            recommendations: formData.recommendations || ''
-          };
-
+          const newInitialFormData: FormData = { /* ... your existing default fields ... */ };
           if (subTemplate.placeholder_keys) {
-            subTemplate.placeholder_keys.forEach(key => {
-              const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
-              // Initialize if not already set by a draft or common defaults
+            subTemplate.placeholder_keys.forEach((key: string) => { // Add type for key
+              const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, (g: string) => g[1].toUpperCase());
               if (!(camelKey in newInitialFormData) || newInitialFormData[camelKey] === undefined) {
-                 newInitialFormData[camelKey] = '';
+                newInitialFormData[camelKey] = '';
               }
             });
           }
-          // Specific default for WJIV assessment instruments
           if (subTemplate.sub_template_id === 'academic-wjiv' && !newInitialFormData.assessmentInstruments) {
               newInitialFormData.assessmentInstruments = 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\\n';
           }
-          
-          setFormData(prevFormData => ({ ...newInitialFormData, ...prevFormData })); // Merge, allowing draft to override defaults
+          setFormData(prevFormData => ({ ...newInitialFormData, ...prevFormData }));
           break;
         }
       }
@@ -391,7 +399,12 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     });
   };
 
-  const renderFormField = (key: string, label: string, type: 'text' | 'textarea' | 'checkbox' = 'text') => {
+  const renderFormField = (
+    key: string, 
+    label: string, 
+    type: 'text' | 'textarea' | 'checkbox' | 'date' | 'number' = 'text',
+    placeholder?: string // Add placeholder as optional
+  ) => {
     const value = formData[key] || '';
     
     if (type === 'checkbox') {
@@ -496,7 +509,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 </h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {getSelectedCategoryTemplates().map((subTemplate) => (
+                {getSelectedCategoryTemplates().map((subTemplate: SubTemplate) => (
                   <button
                     key={subTemplate.id}
                     onClick={() => {
@@ -569,161 +582,218 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   }
 
   // Step 2: Form Input
-  if (currentStep === 2) {
-    return (
-      <div className="animate-fade-in">
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={handlePrevStep}
-            className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
-          <h1 className="text-2xl font-medium">Report Information</h1>
-        </div>
+  if (currentStep === 2 && (selectedTemplateId || isCustomTemplateFlow)) {
+    // Determine current template name and placeholder keys for dynamic forms
+    let currentFormTitle = "Report Details";
+    let currentPlaceholdersForDynamicForm: string[] = [];
+    let currentSubTemplateObject: SubTemplate | null = null;
 
-        <div className="max-w-4xl mx-auto">
-          <div className="card mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <FileText className="text-gold" size={24} />
-              <div>
-                <h2 className="text-xl font-medium">{getSelectedTemplateName()}</h2>
-                <p className="text-text-secondary">Fill in the required information</p>
-              </div>
-            </div>
-          </div>
+    if (isCustomTemplateFlow && routeState?.customTemplatePlaceholders) {
+        currentFormTitle = routeState.customTemplateName || "Custom Report";
+        currentPlaceholdersForDynamicForm = routeState.customTemplatePlaceholders;
+    } else if (selectedTemplateId && templateCategories && subTemplates) { // Use the state variable names
+        // Find the selected sub-template directly from the subTemplatesData array
+        const foundSubTemplate = subTemplates.find((st: SubTemplate) => st.sub_template_id === selectedTemplateId);
+        
+        if (foundSubTemplate) {
+            currentSubTemplateObject = foundSubTemplate; // Assign if found
+            currentFormTitle = foundSubTemplate.name;
+            currentPlaceholdersForDynamicForm = foundSubTemplate.placeholder_keys || [];
+        } else {
+            // Handle case where selectedTemplateId might not match any subTemplate
+            console.warn(`SubTemplate with id "${selectedTemplateId}" not found in mock data.`);
+            // Optionally, redirect or show an error, or clear selectedTemplateId
+            // For now, currentFormTitle will remain "Report Details" and placeholders empty
+        }
+    }
 
-          <div className="space-y-6">
-            {/* Student Information Section */}
-            <div className="card">
-              <button
-                onClick={() => toggleSection('student-info')}
-                className="w-full flex items-center justify-between p-4 hover:bg-bg-secondary rounded-lg transition-colors"
-              >
-                <h3 className="text-lg font-medium">Student Information</h3>
-                {expandedSections.has('student-info') ? 
-                  <ChevronUp size={20} /> : <ChevronDown size={20} />
-                }
-              </button>
-              
-              {expandedSections.has('student-info') && (
-                <div className="p-4 border-t border-border space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {renderFormField('studentName', 'Student Name')}
-                    {renderFormField('dob', 'Date of Birth')}
-                    {renderFormField('doe', 'Date of Evaluation')}
-                    {renderFormField('grade', 'Grade')}
-                    {renderFormField('examiner', 'Examiner')}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Assessment Information Section */}
-            <div className="card">
-              <button
-                onClick={() => toggleSection('assessment-info')}
-                className="w-full flex items-center justify-between p-4 hover:bg-bg-secondary rounded-lg transition-colors"
-              >
-                <h3 className="text-lg font-medium">Assessment Information</h3>
-                {expandedSections.has('assessment-info') ? 
-                  <ChevronUp size={20} /> : <ChevronDown size={20} />
-                }
-              </button>
-              
-              {expandedSections.has('assessment-info') && (
-                <div className="p-4 border-t border-border space-y-4">
-                  {renderFormField('reasonForReferral', 'Reason for Referral', 'textarea')}
-                  {renderFormField('backgroundInfo', 'Background Information', 'textarea')}
-                  {renderFormField('assessmentInstruments', 'Assessment Instruments', 'textarea')}
-                  {renderFormField('behavioralObservations', 'Behavioral Observations', 'textarea')}
-                  
-                  {selectedTemplateId === 'academic-wjiv' && (
-                    <div className="mt-4">
-                      {renderFormField('includeExtendedBattery', 'Include Extended Battery', 'checkbox')}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Results & Interpretation Section */}
-            <div className="card">
-              <button
-                onClick={() => toggleSection('results-interpretation')}
-                className="w-full flex items-center justify-between p-4 hover:bg-bg-secondary rounded-lg transition-colors"
-              >
-                <h3 className="text-lg font-medium">Results & Interpretation</h3>
-                {expandedSections.has('results-interpretation') ? 
-                  <ChevronUp size={20} /> : <ChevronDown size={20} />
-                }
-              </button>
-              
-              {expandedSections.has('results-interpretation') && (
-                <div className="p-4 border-t border-border space-y-4">
-                  {renderFormField('narrativeInterpretation', 'Test Results & Narrative Interpretation', 'textarea')}
-                  {renderFormField('summaryOfFindings', 'Summary of Findings', 'textarea')}
-                  {renderFormField('recommendations', 'Recommendations', 'textarea')}
-                </div>
-              )}
-            </div>
-
-            {/* Dynamic Fields from Template */}
-            {(() => {
-              const dynamicFields = Object.keys(formData).filter(key => 
-                !['studentName', 'dob', 'doe', 'grade', 'examiner', 'reasonForReferral', 
-                  'backgroundInfo', 'assessmentInstruments', 'behavioralObservations', 
-                  'narrativeInterpretation', 'summaryOfFindings', 'recommendations', 
-                  'includeExtendedBattery'].includes(key)
-              );
-
-              if (dynamicFields.length === 0) return null;
-
-              return (
-                <div className="card">
-                  <button
-                    onClick={() => toggleSection('additional-fields')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-bg-secondary rounded-lg transition-colors"
-                  >
-                    <h3 className="text-lg font-medium">Additional Template Fields</h3>
-                    {expandedSections.has('additional-fields') ? 
-                      <ChevronUp size={20} /> : <ChevronDown size={20} />
-                    }
-                  </button>
-                  
-                  {expandedSections.has('additional-fields') && (
-                    <div className="p-4 border-t border-border space-y-4">
-                      {dynamicFields.map(key => {
-                        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                        return renderFormField(key, label, 'textarea');
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          <div className="flex justify-between mt-8">
+    // Specific Multi-Sub-Step UI for 'academic-wjiv'
+    if (selectedTemplateId === 'academic-wjiv') {
+      return (
+        <div className="animate-fadeIn">
+          <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={handlePrevStep}
+              onClick={() => { // Go back to Step 1, clear category/template selections
+                setCurrentStep(1);
+                setSelectedCategoryId(null);
+                setSelectedTemplateId(null);
+                setSearchParams({}); // Clear URL params
+                setCurrentSubStep(1); // Reset sub-step for next time
+              }}
               className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
             >
               <ArrowLeft size={16} />
               Back to Templates
             </button>
-            <button
-              onClick={generateReport}
-              className="btn bg-accent-gold text-black flex items-center gap-2"
-            >
-              <Sparkles size={16} />
-              Generate Report
-            </button>
+            <h1 className="text-2xl font-medium">
+              {currentFormTitle} (Part {currentSubStep} of {wjivSubStepsConfig.length})
+            </h1>
+          </div>
+
+          <div className="card max-w-4xl mx-auto">
+            {/* WJIV Sub-step specific content */}
+            {currentSubStep === 1 && ( /* Student Info */
+              <div className="p-4 animate-fadeIn">
+                <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[0].title}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {renderFormField('studentName', 'Student Name', 'text', "Enter student's full name")}
+                  {renderFormField('dob', 'Date of Birth', 'date')}
+                  {renderFormField('doe', 'Date of Evaluation', 'date')}
+                  {renderFormField('grade', 'Grade Level', 'text', "e.g., 3rd Grade")}
+                  {renderFormField('examiner', 'Examiner', 'text', "Enter examiner's name and credentials")}
+                </div>
+              </div>
+            )}
+            {currentSubStep === 2 && ( /* Background & Referral */
+              <div className="p-4 animate-fadeIn">
+                <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[1].title}</h3>
+                <div className="space-y-4">
+                  {renderFormField('reasonForReferral', 'Reason for Referral', 'textarea', "Describe why the student was referred...")}
+                  {renderFormField('backgroundInfo', 'Background Information', 'textarea', "Include relevant educational history...")}
+                  {renderFormField('assessmentInstruments', 'Assessment Instruments Administered', 'textarea', formData.assessmentInstruments || 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\n')}
+                  {renderFormField('behavioralObservations', 'Behavioral Observations', 'textarea', "Describe student's behavior during assessment...")}
+                </div>
+              </div>
+            )}
+            {currentSubStep === 3 && ( /* WJIV Clusters */
+              <div className="p-4 animate-fadeIn">
+                <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[2].title}</h3>
+                <div className="space-y-4">
+                  {['broad', 'reading', 'written', 'math'].map(cluster => (
+                    <div key={cluster} className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                      <h4 className="font-medium mb-2 capitalize">{cluster} Achievement</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {renderFormField(`wj_${cluster}_ss`, 'Standard Score (SS)', 'number')}
+                        {renderFormField(`wj_${cluster}_pr`, 'Percentile Rank (PR)', 'number')}
+                        {renderFormField(`wj_${cluster}_range`, 'Descriptive Range', 'text')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {currentSubStep === 4 && ( /* Standard & Extended Subtests */
+              <div className="p-4 animate-fadeIn">
+                <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[3].title}</h3>
+                <h4 className="text-md font-medium my-2 text-text-primary">Standard Battery</h4>
+                <div className="space-y-3 mb-6">
+                  {standardSubtestsConfig.map(st => (
+                    <div key={st.id} className="p-2 border rounded bg-bg-secondary">
+                      <h5 className="text-sm mb-1 font-medium">{st.name}</h5>
+                      <div className="grid grid-cols-2 gap-2">
+                        {renderFormField(`wj_${st.id}_ss`, 'SS', 'number')}
+                        {renderFormField(`wj_${st.id}_pr`, 'PR', 'number')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 mb-4">
+                  {renderFormField('includeExtendedBattery', 'Include Extended Battery Subtests?', 'checkbox')}
+                </div>
+                {formData.includeExtendedBattery && (
+                  <>
+                    <h4 className="text-md font-medium my-2 mt-4 text-text-primary">Extended Battery</h4>
+                    <div className="space-y-3">
+                      {extendedSubtestsConfig.map(st => (
+                        <div key={st.id} className="p-2 border rounded bg-bg-secondary">
+                          <h5 className="text-sm mb-1 font-medium">{st.name}</h5>
+                          <div className="grid grid-cols-2 gap-2">
+                            {renderFormField(`wj_${st.id}_ss`, 'SS', 'number')}
+                            {renderFormField(`wj_${st.id}_pr`, 'PR', 'number')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {currentSubStep === 5 && ( /* Narratives */
+              <div className="p-4 animate-fadeIn">
+                <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[4].title}</h3>
+                <div className="space-y-4">
+                  {renderFormField('narrativeInterpretation', 'Narrative Interpretation', 'textarea')}
+                  {renderFormField('summaryOfFindings', 'Summary of Findings', 'textarea')}
+                  {renderFormField('recommendations', 'Recommendations', 'textarea')}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-Step Navigation for WJIV Form */}
+            <div className="flex justify-between items-center mt-8 pt-6 border-t border-border">
+              <button 
+                onClick={() => {
+                  if (currentSubStep === 1) { 
+                    setCurrentStep(1); 
+                    setSelectedCategoryId(null); // Go back to category selection
+                    setSelectedTemplateId(null);
+                    setSearchParams({}); // Clear URL params
+                  } else {
+                    // Smart back for skipping extended battery if it wasn't shown
+                    if (currentSubStep === 5 && !formData.includeExtendedBattery) {
+                      setCurrentSubStep(3);
+                    } else {
+                      setCurrentSubStep(prev => Math.max(1, prev - 1));
+                    }
+                  }
+                }} 
+                className="btn border border-border hover:bg-bg-secondary flex items-center gap-1"
+              >
+                <ArrowLeft size={16}/> {currentSubStep === 1 ? 'Back to Templates' : 'Previous Section'}
+              </button>
+              <button 
+                onClick={() => {
+                  if (currentSubStep === 3 && !formData.includeExtendedBattery) {
+                    setCurrentSubStep(5); // Skip to narrative
+                  } else if (currentSubStep < wjivSubStepsConfig.length) { 
+                    setCurrentSubStep(prev => prev + 1);
+                  } else { // Last sub-step 
+                    generateReport(); // This will set currentStep = 3
+                  }
+                }}
+                className="btn bg-accent-gold text-black flex items-center gap-1"
+              >
+                {currentSubStep === wjivSubStepsConfig.length ? 'Generate & Review Report' : 'Next Section'} <ArrowRight size={16}/>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    } else { 
+      // Fallback for OTHER predefined templates OR custom templates (uses dynamic flat form)
+      return (
+        <div className="animate-fadeIn">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSearchParams({});}}
+              className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
+            >
+              <ArrowLeft size={16} />
+              Back to Templates
+            </button>
+            <h1 className="text-2xl font-medium">Fill: {currentFormTitle}</h1>
+          </div>
+          <div className="card max-w-4xl mx-auto">
+            <div className="space-y-4">
+              {currentPlaceholdersForDynamicForm.length > 0 ? 
+                currentPlaceholdersForDynamicForm.map(key => {
+                  const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
+                  const label = key.replace(/_/g, ' ').toLowerCase();
+                  const type = key.includes('DATE') || key.includes('DOB') ? 'date' : 
+                               (key.includes('SS') || key.includes('PR') || key.includes('SCORE')) ? 'number' : 'textarea';
+                  return renderFormField(camelKey, label, type as any, `Enter ${label}`);
+                })
+                : <p className="text-text-secondary p-4">This template has no defined fields to fill. You can proceed to review.</p>
+              }
+            </div>
+            <div className="flex justify-between items-center mt-8 pt-6 border-t border-border">
+              <button onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSearchParams({});}} className="btn border-border">Back to Templates</button>
+              <button onClick={generateReport} className="btn bg-accent-gold text-black">Generate & Review Report</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Step 3: Preview & Save
