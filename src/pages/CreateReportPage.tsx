@@ -1,571 +1,1089 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  UploadCloud, FileText as FileTextIcon, ArrowRight, ArrowLeft, GraduationCap, 
-  Brain, MessageSquare, Stethoscope, Users, Download, Eye, EyeOff, Save, Trash2, CheckCircle, Loader2
-} from 'lucide-react';
-// useDropzone and mammoth are for the custom template editor flow, not directly used in THIS page for predefined template filling
-// import { useDropzone } from 'react-dropzone'; 
-// import mammoth from 'mammoth'; 
+import React, { useState } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { UploadCloud, FileText, ArrowRight } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 import { useReports, Report } from '../context/ReportContext';
-import { supabase } from '../lib/supabase';
 
-// --- INTERFACES ---
 interface FormData {
-  // Common fields for type safety, but form is now more dynamic
   studentName?: string;
-  dob?: string; 
+  dob?: string;
   doe?: string;
-  // Index signature allows any string key for dynamic placeholders
-  [key: string]: any; 
+  grade?: string;
+  examiner?: string;
+  reasonForReferral?: string;
+  backgroundInfo?: string;
+  assessmentInstruments?: string;
+  behavioralObservations?: string;
+  includeExtendedBattery?: boolean;
+  // Standard Battery Subtests
+  wj_letter_word_ss?: string;
+  // Extended Battery Subtests
+  wj_read_recall_ss?: string;
+  wj_read_recall_pr?: string;
+  wj_num_matrices_ss?: string;
+  wj_num_matrices_pr?: string;
+  wj_editing_ss?: string;
+  wj_editing_pr?: string;
+  wj_word_read_flu_ss?: string;
+  wj_word_read_flu_pr?: string;
+  wj_spell_sounds_ss?: string;
+  wj_spell_sounds_pr?: string;
+  wj_read_vocab_ss?: string;
+  wj_read_vocab_pr?: string;
+  wj_science_ss?: string;
+  wj_science_pr?: string;
+  wj_social_studies_ss?: string;
+  wj_social_studies_pr?: string;
+  wj_humanities_ss?: string;
+  wj_humanities_pr?: string;
+  wj_letter_word_pr?: string;
+  wj_applied_problems_ss?: string;
+  wj_applied_problems_pr?: string;
+  wj_spelling_ss?: string;
+  wj_spelling_pr?: string;
+  wj_passage_comp_ss?: string;
+  wj_passage_comp_pr?: string;
+  wj_calculation_ss?: string;
+  wj_calculation_pr?: string;
+  wj_writing_samples_ss?: string;
+  wj_writing_samples_pr?: string;
+  wj_word_attack_ss?: string;
+  wj_word_attack_pr?: string;
+  wj_oral_reading_ss?: string;
+  wj_oral_reading_pr?: string;
+  wj_sent_read_flu_ss?: string;
+  wj_sent_read_flu_pr?: string;
+  wj_math_facts_flu_ss?: string;
+  wj_math_facts_flu_pr?: string;
+  wj_sent_write_flu_ss?: string;
+  wj_sent_write_flu_pr?: string;
+  wj_broad_ss?: string;
+  wj_broad_pr?: string;
+  wj_broad_range?: string;
+  wj_reading_ss?: string;
+  wj_reading_pr?: string;
+  wj_reading_range?: string;
+  wj_written_ss?: string;
+  wj_written_pr?: string;
+  wj_written_range?: string;
+  wj_math_ss?: string;
+  wj_math_pr?: string;
+  wj_math_range?: string;
+  narrativeInterpretation?: string;
+  summaryOfFindings?: string;
+  recommendations?: string;
 }
 
 interface DraftData {
   formData: FormData;
   selectedTemplateId: string | null;
   currentStep: number;
-  currentSubStep: number; // <<<< ADD THIS
-  selectedCategoryId?: string | null; 
-  selectedFile?: { name: string; type: string; size: number };
+  currentSubStep: number;
+  selectedFile?: { name: string; type: string; size: number }; // Store minimal file info
 }
-
-interface SubTemplate {
-  id: string; // Actual sub_template UUID from Supabase
-  sub_template_id: string; 
-  name: string;
-  description: string;
-  content: string; 
-  placeholder_keys: string[] | null; 
-  category_table_id: string; 
-}
-
-interface TemplateCategory {
-  id: string; // Actual UUID from Supabase
-  category_id: string; // Matches DB
-  category_name: string; // Matches DB
-  category_description: string; // Matches DB
-  icon_name?: string; // Matches DB
-  subTemplates: SubTemplate[];
-}
-
-const DRAFT_KEY_PREFIX = 'reportDraft_';
-const toUpperSnakeCase = (camelCaseOrSnakeCase: string): string => {
-  if (!camelCaseOrSnakeCase) return '';
-  // Simpler conversion: ensure it's all uppercase and words separated by underscores
-  // This handles both camelCase and existing snake_case keys from FormData
-  return camelCaseOrSnakeCase
-    .replace(/([A-Z0-9])/g, "_$1") // Add underscore before capitals/numbers
-    .replace(/__/g, '_')        // Replace double underscores
-    .replace(/^_/, "")           // Remove leading underscore
-    .toUpperCase();
-};
-
-// Map icon names to Lucide components
-const iconMap: { [key: string]: React.ElementType } = {
-  GraduationCap, Brain, MessageSquare, Stethoscope, Users, FileTextIcon
-};
 
 const CreateReportPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const DRAFT_KEY = 'reportDraft';
+  
+  const [searchParams] = useSearchParams();
   const { addReport } = useReports();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [templateCategories, setTemplateCategories] = useState<TemplateCategory[] | null>(null);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
-  const [errorLoadingTemplates, setErrorLoadingTemplates] = useState<string | null>(null);
-  
+  const selectedTemplateId = searchParams.get('template');
+  const currentAction = searchParams.get('action');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [currentSubStep, setCurrentSubStep] = useState<number>(1);
-  const [formData, setFormData] = useState<FormData>({ studentName: '', dob: '', doe: '' }); // Minimal default
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FormData>({});
   
-  // For custom templates passed via route state from ReportDrafting.tsx
-  const routeState = location.state as { 
-    customTemplateContent?: string; 
-    customTemplatePlaceholders?: string[]; // These are UPPER_SNAKE_CASE from TemplateEditorModal
-    customTemplateName?: string;
-    isCustomFlag?: boolean; // Explicit flag from ReportDrafting
-  } | null;
-
-  const isCustomTemplateFlow = !!routeState?.isCustomFlag && searchParams.get('template')?.startsWith('custom-');
-  const customContent = isCustomTemplateFlow ? routeState?.customTemplateContent : undefined;
-  const customPlaceholders = isCustomTemplateFlow ? routeState?.customTemplatePlaceholders : undefined;
-  const customName = isCustomTemplateFlow ? routeState?.customTemplateName : undefined;
-  const initialActionFromUrl = searchParams.get('action');
-
-  // Fetch templates from Supabase
-  useEffect(() => {
-    const fetchTemplatesAndSubtemplates = async () => {
-      setIsLoadingTemplates(true);
-      setErrorLoadingTemplates(null);
-      try {
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('template_categories')
-          .select('*')
-          .order('sort_order');
-
-        if (categoriesError) throw categoriesError;
-        if (!categoriesData) throw new Error("No categories found.");
-
-        const categoriesWithSubtemplates = await Promise.all(
-          categoriesData.map(async (category) => {
-            const { data: subTemplatesData, error: subTemplatesError } = await supabase
-              .from('sub_templates')
-              .select('*')
-              .eq('category_table_id', category.id)
-              .order('sort_order');
-            
-            if (subTemplatesError) throw subTemplatesError;
-            return { ...category, subTemplates: subTemplatesData || [] };
-          })
-        );
-        setTemplateCategories(categoriesWithSubtemplates as TemplateCategory[]);
-      } catch (err: any) {
-        console.error("Error fetching templates:", err);
-        setErrorLoadingTemplates(err.message || "Failed to load report templates.");
-      } finally {
-        setIsLoadingTemplates(false);
-      }
-    };
-    fetchTemplatesAndSubtemplates();
-  }, []);
-
-  // Initialize step and selections based on URL and fetched templates
-  useEffect(() => {
-    if (isLoadingTemplates || !templateCategories) return;
-
-    const templateParam = searchParams.get('template');
-    
-    if (isCustomTemplateFlow && routeState?.customTemplateName && templateParam === selectedTemplateId) { // templateParam might be custom-xyz
-        setSelectedTemplateId(templateParam); // Use the ID from URL if it matches custom flow
-        setSelectedCategoryId('custom'); // Special category for custom
-        setCurrentStep(2);
-        return;
-    }
-
-    if (templateParam) {
-      let found = false;
-      for (const category of templateCategories) {
-        if (category.subTemplates.some(st => st.id === templateParam || st.sub_template_id === templateParam)) { // Check both possible id fields
-          setSelectedCategoryId(category.category_id);
-          setSelectedTemplateId(templateParam);
-          setCurrentStep(2);
-          found = true;
-          // Initialize formData with keys from placeholder_keys if this is a predefined template
-          const currentSub = category.subTemplates.find(st => st.id === templateParam || st.sub_template_id === templateParam);
-          if (currentSub && currentSub.placeholder_keys) {
-            const initialFData: FormData = { studentName: '', dob: '', doe: '' }; // Start with some defaults
-            currentSub.placeholder_keys.forEach(key => {
-              // Convert UPPER_SNAKE_CASE from DB to camelCase for FormData keys
-              const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
-              initialFData[camelKey] = '';
-            });
-            setFormData(initialFData);
-          }
-          break;
-        }
-      }
-      if (!found && !searchParams.get('action')) { setCurrentStep(1); setSelectedCategoryId(null); setSelectedTemplateId(null); }
-    } else if (searchParams.get('action') === 'upload') { // For uploading new template via ReportDrafting page (different flow)
-      setCurrentStep(1); 
-      setSelectedCategoryId(null);
-      setSelectedTemplateId(null);
-    } else if (!isCustomTemplateFlow) { // Default to category selection if no params and not custom flow
-      setCurrentStep(1);
-      setSelectedCategoryId(null);
-      setSelectedTemplateId(null);
-    }
-  }, [searchParams, routeState, templateCategories, isLoadingTemplates, isCustomTemplateFlow, selectedTemplateId]); // Added selectedTemplateId to deps
-
-  // Draft logic
-  const getDraftKey = useCallback((): string => {
-    if (selectedTemplateId) return `${DRAFT_KEY_PREFIX}${selectedTemplateId}`;
-    if (selectedCategoryId) return `${DRAFT_KEY_PREFIX}category_${selectedCategoryId}`;
-    return `${DRAFT_KEY_PREFIX}general_create_page`;
-  }, [selectedTemplateId, selectedCategoryId]);
-
-  useEffect(() => {
-    const draftKey = getDraftKey();
-    const loadedDraft = loadDraft(draftKey);
-    if (loadedDraft && window.confirm('Resume saved draft?')) {
-      setFormData(loadedDraft.formData);
-      setCurrentStep(loadedDraft.currentStep);
-      // setCurrentSubStep(loadedDraft.currentSubStep); // No sub-steps in this version yet for predefined
-      setSelectedCategoryId(loadedDraft.selectedCategoryId || null);
-      setSelectedTemplateId(loadedDraft.selectedTemplateId || null);
-    }
-  }, [getDraftKey]);
-
-  useEffect(() => {
-    const draftKey = getDraftKey();
-    const hasData = Object.values(formData).some(val => typeof val === 'string' ? val !== '' : val !== false);
-    if (hasData || currentStep > 1) {
-      const draftData: DraftData = { formData, selectedTemplateId, currentStep, currentSubStep: 1, selectedCategoryId };
-      saveDraft(draftKey, draftData);
-    }
-  }, [formData, currentStep, selectedTemplateId, selectedCategoryId, getDraftKey]);
-  
-  const saveDraft = (key: string, data: DraftData) => {
+  // Template data with full content for preview
+  const saveDraft = (data: DraftData) => {
     try {
-      localStorage.setItem(key, JSON.stringify(data));
-      console.log("Draft saved to key:", key, data); 
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+      console.log("Draft data prepared for saving:", data); // For debugging
     } catch (error) {
-      console.error("Error saving draft to key:", key, error);
+      console.error("Error saving draft:", error);
     }
   };
 
-  const loadDraft = (key: string): DraftData | null => {
+  const loadDraft = (): DraftData | null => {
     try {
-      const draft = localStorage.getItem(key);
+      const draft = localStorage.getItem(DRAFT_KEY);
       if (draft) {
-        console.log("Draft loaded from localStorage for key:", key);
+        console.log("Draft loaded from localStorage."); // For debugging
         return JSON.parse(draft);
       }
       return null;
     } catch (error) {
-      console.error("Error loading draft from key:", key, error);
+      console.error("Error loading draft:", error);
       return null;
     }
   };
 
-  const clearDraft = (key: string) => {
+  const clearDraft = () => {
     try {
-      localStorage.removeItem(key);
-      console.log("Draft cleared for key:", key); 
+      localStorage.removeItem(DRAFT_KEY);
+      console.log("Draft cleared from localStorage."); // For debugging
     } catch (error) {
-      console.error("Error clearing draft for key:", key, error);
+      console.error("Error clearing draft:", error);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const populateTemplate = (templateContent: string, data: FormData, placeholdersToUse?: string[]): string => {
-    let populatedContent = templateContent;
-    
-    const keysToIterate = placeholdersToUse || Object.keys(data);
+  const fullTemplatesData = [
+    {
+      id: 'academic-achievement',
+      name: 'Academic Achievement Report',
+      description: 'Comprehensive report on student academic skills, often using WJ IV, WIAT, etc.',
+      content: `# ACADEMIC ACHIEVEMENT REPORT
 
-    keysToIterate.forEach(key => {
-      // If placeholdersToUse is provided, key is already UPPER_SNAKE_CASE
-      // Otherwise, convert from formData key (camelCase)
-      const placeholderKey = placeholdersToUse ? key : toUpperSnakeCase(key);
-      const value = String(data[key] ?? ''); // data[key] uses camelCase if iterating Object.keys(data)
-      
-      const regex = new RegExp(`\\[${placeholderKey}\\]`, 'g');
-      populatedContent = populatedContent.replace(regex, value || '[N/A]');
-    });
+## Student Information
+Name: [STUDENT_NAME]
+Date of Birth: [DOB]
+Date of Evaluation: [DOE]
+Grade: [GRADE]
+Examiner: [EXAMINER]
+
+## Reason for Referral
+[REASON_FOR_REFERRAL]
+
+## Background Information
+[BACKGROUND_INFO]
+
+## Assessment Instruments Administered
+[ASSESSMENT_INSTRUMENTS]
+
+## Behavioral Observations
+[BEHAVIORAL_OBSERVATIONS]
+
+## Test Results & Interpretation
+### Woodcock-Johnson IV Tests of Achievement
+**Clusters:**
+- Broad Achievement: SS [WJ_BROAD_SS], PR [WJ_BROAD_PR], Range [WJ_BROAD_RANGE]
+- Reading: SS [WJ_READING_SS], PR [WJ_READING_PR], Range [WJ_READING_RANGE]
+- Written Language: SS [WJ_WRITTEN_SS], PR [WJ_WRITTEN_PR], Range [WJ_WRITTEN_RANGE]
+- Mathematics: SS [WJ_MATH_SS], PR [WJ_MATH_PR], Range [WJ_MATH_RANGE]
+
+**Standard Battery Subtests:**
+- Letter-Word Identification: SS [WJ_LETTER_WORD_SS], PR [WJ_LETTER_WORD_PR]
+- Applied Problems: SS [WJ_APPLIED_PROBLEMS_SS], PR [WJ_APPLIED_PROBLEMS_PR]
+- Spelling: SS [WJ_SPELLING_SS], PR [WJ_SPELLING_PR]
+- Passage Comprehension: SS [WJ_PASSAGE_COMP_SS], PR [WJ_PASSAGE_COMP_PR]
+- Calculation: SS [WJ_CALCULATION_SS], PR [WJ_CALCULATION_PR]
+- Writing Samples: SS [WJ_WRITING_SAMPLES_SS], PR [WJ_WRITING_SAMPLES_PR]
+- Word Attack: SS [WJ_WORD_ATTACK_SS], PR [WJ_WORD_ATTACK_PR]
+- Oral Reading: SS [WJ_ORAL_READING_SS], PR [WJ_ORAL_READING_PR]
+- Sentence Reading Fluency: SS [WJ_SENT_READ_FLU_SS], PR [WJ_SENT_READ_FLU_PR]
+- Math Facts Fluency: SS [WJ_MATH_FACTS_FLU_SS], PR [WJ_MATH_FACTS_FLU_PR]
+- Sentence Writing Fluency: SS [WJ_SENT_WRITE_FLU_SS], PR [WJ_SENT_WRITE_FLU_PR]
+
+[IF_INCLUDE_EXTENDED_BATTERY_START]
+**Extended Battery Subtests:**
+- Reading Recall: SS [WJ_READ_RECALL_SS], PR [WJ_READ_RECALL_PR]
+- Number Matrices: SS [WJ_NUM_MATRICES_SS], PR [WJ_NUM_MATRICES_PR]
+- Editing: SS [WJ_EDITING_SS], PR [WJ_EDITING_PR]
+- Word Reading Fluency: SS [WJ_WORD_READ_FLU_SS], PR [WJ_WORD_READ_FLU_PR]
+- Spelling of Sounds: SS [WJ_SPELL_SOUNDS_SS], PR [WJ_SPELL_SOUNDS_PR]
+- Reading Vocabulary: SS [WJ_READ_VOCAB_SS], PR [WJ_READ_VOCAB_PR]
+- Science: SS [WJ_SCIENCE_SS], PR [WJ_SCIENCE_PR]
+- Social Studies: SS [WJ_SOCIAL_STUDIES_SS], PR [WJ_SOCIAL_STUDIES_PR]
+- Humanities: SS [WJ_HUMANITIES_SS], PR [WJ_HUMANITIES_PR]
+[IF_INCLUDE_EXTENDED_BATTERY_END]
+
+## Narrative Interpretation of Academic Scores
+[NARRATIVE_INTERPRETATION]
+
+## Summary of Findings
+[SUMMARY_OF_FINDINGS]
+
+## Recommendations
+[RECOMMENDATIONS]`
+    },
+    {
+      id: 'cognitive-processing',
+      name: 'Cognitive Processing Report',
+      description: 'Details student cognitive abilities, processing strengths, and weaknesses.',
+      content: `# COGNITIVE PROCESSING REPORT
+## Student Information
+Name: [STUDENT_NAME]
+Date of Birth: [DOB]
+## Overall Scores
+FSIQ: [FSIQ_SCORE_PLACEHOLDER] 
+## Summary
+[SUMMARY_PLACEHOLDER]`
+    },
+    {
+      id: 'speech-language',
+      name: 'Speech & Language Report',
+      description: 'Assesses various aspects of communication including receptive/expressive language, articulation, fluency, and voice.',
+      content: `# SPEECH AND LANGUAGE REPORT
+## Student Information
+Name: [STUDENT_NAME]
+## Articulation
+[ARTICULATION_NOTES_PLACEHOLDER]
+## Language
+[LANGUAGE_NOTES_PLACEHOLDER]
+## Summary
+[SUMMARY_PLACEHOLDER]`
+    }
+  ];
+
+  const toUpperSnakeCase = (camelCase: string): string => {
+    return camelCase
+      .replace(/([A-Z])/g, "_$1")
+      .toUpperCase();
+  };
+
+  const populateTemplate = (templateContent: string, data: FormData): string => {
+    let populatedContent = templateContent;
+
+    // Handle conditional extended battery block
+    const extendedStartTag = "[IF_INCLUDE_EXTENDED_BATTERY_START]";
+    const extendedEndTag = "[IF_INCLUDE_EXTENDED_BATTERY_END]";
+    const startIndex = populatedContent.indexOf(extendedStartTag);
+    const endIndex = populatedContent.indexOf(extendedEndTag);
+
+    if (startIndex !== -1 && endIndex !== -1) {
+      if (data.includeExtendedBattery) {
+        populatedContent = populatedContent.replace(extendedStartTag, "").replace(extendedEndTag, "");
+      } else {
+        populatedContent = populatedContent.substring(0, startIndex) + populatedContent.substring(endIndex + extendedEndTag.length);
+      }
+    }
     
-    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]'); // Clean up remaining
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key) && key !== 'includeExtendedBattery') {
+        const placeholderKey = toUpperSnakeCase(key);
+        const placeholder = `[${placeholderKey}]`;
+        const value = String(data[key as keyof FormData] ?? '');
+        
+        const regex = new RegExp(`\\[${placeholderKey}\\]`, 'g');
+        populatedContent = populatedContent.replace(regex, value || '[N/A]');
+      }
+    }
+
+    // Replace any remaining unfilled placeholders with [N/A]
+    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]');
     return populatedContent;
   };
-  
-  const createDocxDocument = (data: FormData, templateContentToUse: string, isCustom: boolean, placeholdersForCustom?: string[]): Document => {
-    const populatedReportText = populateTemplate(templateContentToUse, data, isCustom ? placeholdersForCustom : undefined);
-    const docxParagraphs: Paragraph[] = [];
 
-    if (isCustom) { // Custom template content is HTML from Quill
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = populatedReportText;
-      // Basic HTML to DOCX Paragraph conversion (can be improved)
-      Array.from(tempDiv.childNodes).forEach(node => {
-        if (node.textContent?.trim()) {
-          // This is very basic, doesn't handle headings, lists from HTML well
-          docxParagraphs.push(new Paragraph({ children: [new TextRun(node.textContent)] }));
-        }
-      });
-      if (docxParagraphs.length === 0) docxParagraphs.push(new Paragraph(populatedReportText));
-
-    } else { // Predefined Markdown-like
-      const lines = populatedReportText.split('\\n');
-      lines.forEach(line => {
-        const trimmedLine = line.trim();
-        if (trimmedLine.startsWith('## ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(3), heading: HeadingLevel.HEADING_2 })); }
-        else if (trimmedLine.startsWith('# ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), heading: HeadingLevel.HEADING_1 })); }
-        else if (trimmedLine.startsWith('- ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), bullet: { level: 0 } })); }
-        else if (trimmedLine) { docxParagraphs.push(new Paragraph({ text: trimmedLine })); }
-        else { docxParagraphs.push(new Paragraph({ text: "" }));} 
-      });
-    }
-    return new Document({ sections: [{ properties: {}, children: docxParagraphs }] });
-  };
-
-  const downloadDocxFile = async () => {
-    let contentToUse: string | undefined;
-    let filenameSuffix = 'Report';
-    let currentPlaceholders = undefined;
-
-    if (isCustomTemplateFlow && customContent) {
-      contentToUse = customContent;
-      filenameSuffix = customName || 'Custom_Report';
-      currentPlaceholders = customPlaceholders;
-    } else if (selectedTemplateId && templateCategories) {
-      const category = templateCategories.find(c => c.subTemplates.some(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId));
-      const subTemplate = category?.subTemplates.find(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId);
-      contentToUse = subTemplate?.content;
-      filenameSuffix = subTemplate?.name || selectedTemplateId;
-      // For predefined, placeholder_keys are derived from FormData if not explicitly passed
-    }
-
-    if (!contentToUse) { alert("Template content not found for DOCX."); return; }
+  const createDocxDocument = (data: FormData, templateId: string, fullTemplateContent: string): Document => {
+    // First populate the template with data
+    const populatedContent = populateTemplate(fullTemplateContent, data);
     
-    const studentNameSanitized = (formData.studentName || 'Student').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    const filename = `${studentNameSanitized}_${filenameSuffix.replace(/\s+/g, '_')}.docx`;
+    // Split content into lines for processing
+    const lines = populatedContent.split('\n');
+    const paragraphs: Paragraph[] = [];
     
-    const doc = createDocxDocument(formData, contentToUse, !!isCustomTemplateFlow, currentPlaceholders);
-    const blob = await Packer.toBlob(doc);
-    saveAs(blob, filename);
-  };
-  
-  const handleFinalizeReport = () => {
-    let contentToUse: string | undefined;
-    let templateNameToSave: string | undefined;
-    let currentPlaceholdersForPopulation = undefined;
-
-    if (isCustomTemplateFlow && customContent) {
-        contentToUse = customContent;
-        templateNameToSave = customName || "Custom Report";
-        currentPlaceholdersForPopulation = customPlaceholders;
-    } else if (selectedTemplateId && templateCategories) {
-        const category = templateCategories.find(c => c.subTemplates.some(st => st.id === selectedTemplateId));
-        const subTemplate = category?.subTemplates.find(st => st.id === selectedTemplateId);
-        contentToUse = subTemplate?.content;
-        templateNameToSave = subTemplate?.name;
-        // For predefined, populateTemplate will use Object.keys(formData)
-    }
-
-    if (!contentToUse || !templateNameToSave || !formData.studentName) {
-      alert("Student name and template selection are required."); return;
-    }
-    
-    const reportText = populateTemplate(contentToUse, formData, currentPlaceholdersForPopulation);
-    const newReportToAdd: Report = {
-      id: Date.now(), name: `${formData.studentName} - ${templateNameToSave}`,
-      type: templateNameToSave, date: new Date().toISOString().split('T')[0], status: 'Completed',
-      content: reportText, formData: { ...formData }
-    };
-    addReport(newReportToAdd);
-    clearDraft(getDraftKey());
-    navigate('/reports');
-  };
-
-  // --- RENDER LOGIC ---
-  if (isLoadingTemplates && !isCustomTemplateFlow) { 
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-8">
-        <Loader2 className="h-12 w-12 animate-spin text-gold" />
-        <p className="ml-4 mt-4 text-lg text-text-secondary">Loading Templates...</p>
-      </div>
-    );
-  }
-  if (errorLoadingTemplates) { 
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-8 text-center">
-        <FileTextIcon className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold text-red-500 mb-2">Error Loading Templates</h2>
-        <p className="text-text-secondary mb-4">{errorLoadingTemplates}</p>
-        <button onClick={() => window.location.reload()} className="btn bg-red-500 text-white">
-          Try Reloading
-        </button>
-      </div>
-    );
-  }
-  // Check if templateCategories is null or empty, AND it's not a custom template flow,
-  // AND we are at step 1, and no category or action is selected yet (to avoid showing this during sub-template view etc.)
-  if ((!templateCategories || templateCategories.length === 0) && !isCustomTemplateFlow && currentStep === 1 && !selectedCategoryId && !searchParams.get('action')) { 
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-8 text-center">
-        <FileTextIcon className="h-12 w-12 text-text-secondary opacity-50 mb-4" />
-        <h2 className="text-xl font-semibold text-text-primary mb-2">No Templates Available</h2>
-        <p className="text-text-secondary">It seems there are no report templates configured in the system.</p>
-        <p className="text-text-secondary mt-1">Please check the Supabase setup or contact an administrator.</p>
-      </div>
-    );
-  }
-
-  // Step 1: Category or Sub-template selection, or Upload Action
-  if (currentStep === 1) {
-    // If action=upload from URL (e.g. from ReportDrafting) - this flow needs specific UI if it's for NEW template definition
-    if (initialActionFromUrl === 'upload' && !selectedTemplateId) { // Distinguish from CreateReportPage's own upload link
-        return (
-            <div className="animate-fadeIn card max-w-5xl mx-auto">
-                <h2 className="text-xl font-medium mb-4">Custom Template Upload</h2>
-                <p className="text-text-secondary">This page is for filling reports. To define a new custom template from a DOCX file, please use the "Upload Custom Template" feature on the main "Report Drafting" page.</p>
-                <button onClick={() => navigate('/reports')} className="btn mt-4">Back to Report Drafting</button>
-            </div>
-        );
-    }
-    // If a category is selected, show its sub-templates
-    else if (selectedCategoryId && !selectedTemplateId) {
-      const category = templateCategories!.find(c => c.category_id === selectedCategoryId);
-      return (
-        <div className="animate-fadeIn card max-w-4xl mx-auto">
-          <div className="flex items-center mb-6">
-            <button onClick={() => {setSelectedCategoryId(null); clearDraft(getDraftKey());}} className="btn btn-primary text-sm mr-4"><ArrowLeft size={16} className="inline mr-1"/>Back to Categories</button>
-            <h2 className="text-xl font-medium">Choose from: {category?.category_name}</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {category?.subTemplates.map((subTemplate) => (
-              <button key={subTemplate.id} onClick={() => { setSelectedTemplateId(subTemplate.id); setCurrentStep(2); clearDraft(getDraftKey());}} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
-                <h4 className="font-semibold text-md text-text-primary mb-1">{subTemplate.name}</h4>
-                <p className="text-xs text-text-secondary line-clamp-2">{subTemplate.description}</p>
-                <div className="mt-3 text-gold text-xs font-medium">Use Template <ArrowRight className="inline w-3 h-3" /></div>
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    } 
-    // Default: Show Categories
-    else {
-      return (
-        <div className="animate-fadeIn card max-w-5xl mx-auto">
-          <h2 className="text-xl font-medium mb-6 text-center">Step 1: Choose a Report Category</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templateCategories!.map((category) => {
-              const IconComponent = category.icon_name ? iconMap[category.icon_name] || FileTextIcon : FileTextIcon;
-              return (
-                <button key={category.category_id} onClick={() => { setSelectedCategoryId(category.category_id); clearDraft(getDraftKey()); }} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
-                  <div className="flex items-center gap-3 mb-2"><IconComponent className="text-gold group-hover:scale-105" size={24} /> <h3 className="font-semibold text-md text-text-primary">{category.category_name}</h3></div>
-                  <p className="text-xs text-text-secondary mb-3">{category.category_description}</p>
-                  <div className="mt-auto text-gold text-xs font-medium">View Templates <ArrowRight className="inline w-3 h-3" /></div>
-                </button>
-            );})}
-          </div>
-           <div className="mt-8 pt-4 border-t border-border text-center">
-                <p className="text-text-secondary mb-3">To use your own DOCX file as a template:</p>
-                <button onClick={() => navigate('/reports', {state: {triggerUpload: true}})} className="btn border-border hover:border-gold text-gold">Upload via Report Drafting Page</button>
-            </div>
-        </div>
-      );
-    }
-  }
-
-  // Step 2: Data Input Form
-  if (currentStep === 2 && (selectedTemplateId || isCustomTemplateFlow)) {
-    let fieldsToRender: Array<{key: string, label: string, type?: 'text'|'date'|'textarea'|'number', placeholder?: string}> = [];
-    let currentFormName = "Report Details";
-    let currentSubTemplateForForm = null;
-
-    if (isCustomTemplateFlow && customPlaceholders) {
-        currentFormName = customName || "Custom Report";
-        fieldsToRender = customPlaceholders.map(key => ({ 
-            key, label: key.replace(/_/g, ' ').toLowerCase(), type: 'textarea',
-            placeholder: `Enter ${key.replace(/_/g, ' ').toLowerCase()}`
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines
+      if (!trimmedLine) {
+        paragraphs.push(new Paragraph({ text: '' }));
+        continue;
+      }
+      
+      // Handle different heading levels
+      if (trimmedLine.startsWith('# ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(2),
+          heading: HeadingLevel.HEADING_1,
         }));
-    } else if (selectedTemplateId && templateCategories) {
-        const category = templateCategories.find(c => c.subTemplates.some(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId));
-        currentSubTemplateForForm = category?.subTemplates.find(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId);
-        currentFormName = currentSubTemplateForForm?.name || "Report Details";
+      } else if (trimmedLine.startsWith('## ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(3),
+          heading: HeadingLevel.HEADING_2,
+        }));
+      } else if (trimmedLine.startsWith('### ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(4),
+          heading: HeadingLevel.HEADING_3,
+        }));
+      } else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+        // Handle bold text
+        paragraphs.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: trimmedLine.substring(2, trimmedLine.length - 2),
+              bold: true,
+            }),
+          ],
+        }));
+      } else if (trimmedLine.startsWith('- ')) {
+        // Handle bullet points
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(2),
+          bullet: {
+            level: 0,
+          },
+        }));
+      } else {
+        // Regular paragraph
+        paragraphs.push(new Paragraph({
+          text: trimmedLine,
+        }));
+      }
+    }
+    
+    return new Document({
+      sections: [{
+        properties: {},
+        children: paragraphs,
+      }],
+    });
+  };
 
-        if (currentSubTemplateForForm?.placeholder_keys) {
-            fieldsToRender = currentSubTemplateForForm.placeholder_keys.map(key => ({
-                key: key.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase()), // Convert DB key to camelCase for FormData
-                label: key.replace(/_/g, ' ').toLowerCase(),
-                // Infer type based on key name (basic example)
-                type: key.includes('DATE') ? 'date' : (key.includes('SS') || key.includes('PR') || key.includes('SCORE')) ? 'number' : 'textarea',
-                placeholder: `Enter ${key.replace(/_/g, ' ').toLowerCase()}`
-            }));
-        } else { // Fallback if no placeholder_keys defined for a predefined template
-             fieldsToRender = [{ key: 'contentBody', label: 'Main Content', type: 'textarea', placeholder: 'Enter all report content here...' }];
-        }
+  const downloadDocxFile = async (filename: string, data: FormData, templateId: string) => {
+    try {
+      const currentTemplateObject = fullTemplatesData.find(t => t.id === templateId);
+      if (!currentTemplateObject) {
+        alert("Error: Could not find template to generate download.");
+        return;
+      }
+      
+      console.log('Creating DOCX document...');
+      const doc = createDocxDocument(data, templateId, currentTemplateObject.content);
+      
+      console.log('Converting to blob...');
+      const blob = await Packer.toBlob(doc);
+      
+      console.log('Saving file...');
+      saveAs(blob, filename);
+      
+      console.log('DOCX file download initiated successfully');
+    } catch (error) {
+      console.error('Error generating DOCX file:', error);
+      alert('Error generating DOCX file. Please try again.');
     }
-    
-    // If it's academic-wjiv, we use the multi-sub-step form
-    if (selectedTemplateId === 'academic-wjiv') {
-      return (
-        <div className="animate-fadeIn card">
-          <h2 className="text-xl font-medium mb-6">Fill: {currentFormName} (Sub-step {currentSubStep} of 5)</h2>
-          {/* PASTE YOUR FULL MULTI-SUB-STEP ACADEMIC WJIV FORM JSX HERE */}
-          {/* It should use currentSubStep to show different sections */}
-          {/* And its own Back/Next buttons to control currentSubStep or move to currentStep 3 */}
-          <p className="text-center p-10 text-gray-500">
-            (Placeholder: Detailed multi-sub-step form for WJIV Academic Report goes here, controlled by `currentSubStep` state)
-          </p>
-           <div className="flex justify-between items-center mt-8 pt-4 border-t border-border">
-            <button onClick={() => currentSubStep > 1 ? setCurrentSubStep(s => s - 1) : setCurrentStep(1)} className="btn border-border">
-              {currentSubStep === 1 ? 'Back to Templates' : 'Previous Section'}
-            </button>
-            <button onClick={() => currentSubStep < 5 ? setCurrentSubStep(s => s + 1) : setCurrentStep(3)} className="btn bg-accent-gold text-black">
-              {currentSubStep === 5 ? 'Review Report' : 'Next Section'}
-            </button>
-          </div>
-        </div>
-      );
+  };
+
+  const downloadTextFile = (filename: string, text: string) => {
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  };
+
+  const onDrop = React.useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles && acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setSelectedFile(file);
+      setCurrentStep(1);
+      setCurrentSubStep(1);
+      console.log('Dropped file:', file);
     }
-    
-    // For other predefined templates or custom templates (rendered as flat list of fields)
-    return (
-      <div className="animate-fadeIn card">
-        <h2 className="text-xl font-medium mb-6">Fill: {currentFormName}</h2>
-        <div className="space-y-4">
-          {fieldsToRender.map(field => (
-            <div key={field.key}>
-              <label htmlFor={field.key} className="block text-sm font-medium mb-1 text-text-primary capitalize">{field.label}</label>
-              {field.type === 'textarea' ? (
-                <textarea name={field.key} id={field.key} value={formData[field.key] || ''} onChange={handleInputChange} rows={4} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" placeholder={field.placeholder || field.label}/>
-              ) : (
-                <input type={field.type || 'text'} name={field.key} id={field.key} value={formData[field.key] || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" placeholder={field.placeholder || field.label}/>
+  }, []);
+  
+  const { getRootProps, getInputProps, isDragActive, isDragAccept, isDragReject } = useDropzone({
+    onDrop,
+    accept: {
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt']
+    },
+    multiple: false
+  });
+
+  // Standard Battery Subtests Configuration
+  const standardSubtests = [
+    { id: 'letter_word', name: '1. Letter-Word Identification' },
+    { id: 'applied_problems', name: '2. Applied Problems' },
+    { id: 'spelling', name: '3. Spelling' },
+    { id: 'passage_comp', name: '4. Passage Comprehension' },
+    { id: 'calculation', name: '5. Calculation' },
+    { id: 'writing_samples', name: '6. Writing Samples' },
+    { id: 'word_attack', name: '7. Word Attack' },
+    { id: 'oral_reading', name: '8. Oral Reading' },
+    { id: 'sent_read_flu', name: '9. Sentence Reading Fluency' },
+    { id: 'math_facts_flu', name: '10. Math Facts Fluency' },
+    { id: 'sent_write_flu', name: '11. Sentence Writing Fluency' }
+  ];
+
+  const extendedSubtests = [
+    { id: 'read_recall', name: '12. Reading Recall' },
+    { id: 'num_matrices', name: '13. Number Matrices' },
+    { id: 'editing', name: '14. Editing' },
+    { id: 'word_read_flu', name: '15. Word Reading Fluency' },
+    { id: 'spell_sounds', name: '16. Spelling of Sounds' },
+    { id: 'read_vocab', name: '17. Reading Vocabulary' },
+    { id: 'science', name: '18. Science' },
+    { id: 'social_studies', name: '19. Social Studies' },
+    { id: 'humanities', name: '20. Humanities' }
+  ];
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    setFormData(prev => ({ ...prev, [name]: val }));
+  };
+  
+  const availableTemplates = [
+    { id: 'academic-achievement', name: 'Academic Achievement Report', description: 'Comprehensive report on student academic skills, often using WJ IV, WIAT, etc.' },
+    { id: 'cognitive-processing', name: 'Cognitive Processing Report', description: 'Details student cognitive abilities, processing strengths, and weaknesses.' },
+    { id: 'speech-language', name: 'Speech & Language Report', description: 'Assesses various aspects of communication including receptive/expressive language, articulation, fluency, and voice.' },
+  ];
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setCurrentStep(1); // Reset to step 1 confirmation for the new file
+      setCurrentSubStep(1); // Reset sub-step
+      console.log('Selected file:', file);
+    }
+  };
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-medium">Create New Report</h1>
+        <Link to="/reports" className="btn btn-primary">
+          Back to Reports
+        </Link>
+      </div>
+      
+      <div className="card">
+        {currentStep === 1 && (
+          currentAction === 'upload' ? (
+            <>
+              <h2 className="text-xl font-medium mb-4">Upload Your Report Template</h2>
+              <div 
+                {...getRootProps()} 
+                className={`p-10 border-2 border-dashed rounded-md text-center transition-all cursor-pointer bg-bg-secondary hover:bg-opacity-30 
+                  ${isDragActive ? 'border-gold ring-2 ring-gold' : 'border-border hover:border-gold'}
+                  ${isDragAccept ? 'border-green bg-green bg-opacity-5' : ''}
+                  ${isDragReject ? 'border-red-500 bg-red-500 bg-opacity-5' : ''}`}
+              >
+                <input {...getInputProps()} />
+                <UploadCloud 
+                  size={48} 
+                  className={`mx-auto mb-4 ${
+                    isDragAccept ? 'text-green' :
+                    isDragReject ? 'text-red-500' :
+                    isDragActive ? 'text-gold' : 'text-text-secondary'
+                  }`} 
+                />
+                {isDragReject ? (
+                  <p className="font-medium text-red-500 mb-1">File type not accepted</p>
+                ) : isDragAccept ? (
+                  <p className="font-medium text-green mb-1">Drop to upload template</p>
+                ) : isDragActive ? (
+                  <p className="font-medium text-gold mb-1">Drop the file here</p>
+                ) : (
+                  <p className="font-medium text-text-primary mb-1">Drag & drop your template file here</p>
+                )}
+                <p className="text-sm text-text-secondary mb-4">(.docx, .pdf, or .txt files)</p>
+                <button type="button" className="mt-4 btn btn-primary">
+                  Or Click to Browse
+                </button>
+              </div>
+              {selectedFile && (
+                <div className="mt-4 p-3 bg-bg-primary border border-border rounded-md">
+                  <p className="text-sm font-medium text-text-primary">Selected file: {selectedFile.name}</p>
+                  <p className="text-xs text-text-secondary">Type: {selectedFile.type || 'application/octet-stream'}, Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                  <div className="mt-4 text-right">
+                    <button 
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setCurrentSubStep(1);
+                      }} 
+                      className="btn border border-border hover:bg-bg-secondary mr-2"
+                    >
+                      Clear Selection
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setCurrentStep(2);
+                        setCurrentSubStep(1);
+                      }} 
+                      className="btn bg-accent-gold text-black"
+                    >
+                      Use this File & Continue
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : selectedTemplateId ? (
+            <>
+              <h2 className="text-xl font-medium mb-4">Selected Template</h2>
+              <p className="mb-2">You have selected template ID: {selectedTemplateId}.</p>
+              <p className="text-text-secondary">(Next step: Input/Upload Scores - UI coming soon)</p>
+              <div className="mt-6 text-right">
+                <button 
+                  onClick={() => {
+                    setCurrentStep(2);
+                    setCurrentSubStep(1);
+                  }} 
+                  className="btn bg-accent-gold text-black"
+                >
+                  Continue with this Template
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-medium mb-6">Step 1: Choose an Existing Template</h2>
+              <div className="space-y-4">
+                {availableTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="w-full text-left p-4 border border-border rounded-md transition-all hover:border-gold hover:bg-gold hover:bg-opacity-10 flex flex-col"
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <FileText className="text-gold mt-1" size={20} />
+                      <div>
+                        <h3 className="font-semibold text-lg">{template.name}</h3>
+                        <p className="text-sm text-text-secondary line-clamp-2">{template.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 mt-auto pt-2">
+                      <Link
+                        to={`?template=${template.id}`}
+                        className="btn-sm bg-accent-gold text-black hover:bg-opacity-90 px-4 py-1.5 text-sm flex items-center gap-1.5"
+                        onClick={() => {
+                          setSelectedFile(null); 
+                        }}
+                      >
+                        Select this Template
+                        <ArrowRight size={14} />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-8 pt-6 border-t border-border text-center">
+                <p className="text-text-secondary mb-3">Or, if you have your own template file:</p>
+                <Link 
+                  to="?action=upload" 
+                  className="btn border border-border hover:border-gold text-gold"
+                  onClick={() => {
+                    setSelectedFile(null);
+                  }}
+                >
+                  Upload a Custom Template File
+                </Link>
+              </div>
+            </>
+          )
+        )}
+        
+        {currentStep === 2 && (
+          <>
+            <h2 className="text-xl font-medium mb-4">Step 2: Input Scores & Narrative</h2>
+            <p className="text-text-secondary mb-6">
+              {selectedFile ? 
+                `You are using the uploaded file: ${selectedFile.name}. (Placeholder for template parsing results and score input fields).` :
+              selectedTemplateId ?
+                `You are using template ID: ${selectedTemplateId}. (Placeholder for score input fields).` :
+                "Error: No template or file selected." 
+              }
+            </p>
+            
+            <div className="space-y-6">
+              {selectedTemplateId === 'academic-achievement' && (
+                <div className="space-y-6">
+                  {/* Sub-Step 1: Student Information */}
+                  {currentSubStep === 1 && (
+                  <div className="p-4 border border-border rounded-md animate-fadeIn">
+                    <h3 className="text-lg font-semibold mb-3 text-gold">Student Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="studentName" className="block text-sm font-medium mb-1">Student Name</label>
+                        <input
+                          type="text"
+                          name="studentName"
+                          id="studentName"
+                          value={formData.studentName || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="dob" className="block text-sm font-medium mb-1">Date of Birth</label>
+                        <input
+                          type="date"
+                          name="dob"
+                          id="dob"
+                          value={formData.dob || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="doe" className="block text-sm font-medium mb-1">Date of Evaluation</label>
+                        <input
+                          type="date"
+                          name="doe"
+                          id="doe"
+                          value={formData.doe || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="grade" className="block text-sm font-medium mb-1">Grade</label>
+                        <input
+                          type="text"
+                          name="grade"
+                          id="grade"
+                          value={formData.grade || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label htmlFor="examiner" className="block text-sm font-medium mb-1">Examiner</label>
+                        <input
+                          type="text"
+                          name="examiner"
+                          id="examiner"
+                          value={formData.examiner || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Sub-Step 2: WJ IV Clusters */}
+                  {currentSubStep === 2 && (
+                  <div className="p-4 border border-border rounded-md animate-fadeIn">
+                    <h3 className="text-lg font-semibold mb-3 text-gold">Woodcock-Johnson IV - Clusters</h3>
+                    <div className="space-y-4">
+                      {/* Broad Achievement */}
+                      <div className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                        <h4 className="font-medium mb-2">Broad Achievement</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label htmlFor="wj_broad_ss" className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                            <input type="number" name="wj_broad_ss" id="wj_broad_ss" value={formData.wj_broad_ss || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_broad_pr" className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                            <input type="number" name="wj_broad_pr" id="wj_broad_pr" value={formData.wj_broad_pr || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_broad_range" className="block text-xs font-medium mb-1">Descriptive Range</label>
+                            <input type="text" name="wj_broad_range" id="wj_broad_range" value={formData.wj_broad_range || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Reading */}
+                      <div className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                        <h4 className="font-medium mb-2">Reading</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label htmlFor="wj_reading_ss" className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                            <input type="number" name="wj_reading_ss" id="wj_reading_ss" value={formData.wj_reading_ss || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_reading_pr" className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                            <input type="number" name="wj_reading_pr" id="wj_reading_pr" value={formData.wj_reading_pr || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_reading_range" className="block text-xs font-medium mb-1">Descriptive Range</label>
+                            <input type="text" name="wj_reading_range" id="wj_reading_range" value={formData.wj_reading_range || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Written Language */}
+                      <div className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                        <h4 className="font-medium mb-2">Written Language</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label htmlFor="wj_written_ss" className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                            <input type="number" name="wj_written_ss" id="wj_written_ss" value={formData.wj_written_ss || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_written_pr" className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                            <input type="number" name="wj_written_pr" id="wj_written_pr" value={formData.wj_written_pr || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_written_range" className="block text-xs font-medium mb-1">Descriptive Range</label>
+                            <input type="text" name="wj_written_range" id="wj_written_range" value={formData.wj_written_range || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Mathematics */}
+                      <div className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                        <h4 className="font-medium mb-2">Mathematics</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label htmlFor="wj_math_ss" className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                            <input type="number" name="wj_math_ss" id="wj_math_ss" value={formData.wj_math_ss || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_math_pr" className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                            <input type="number" name="wj_math_pr" id="wj_math_pr" value={formData.wj_math_pr || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                          <div>
+                            <label htmlFor="wj_math_range" className="block text-xs font-medium mb-1">Descriptive Range</label>
+                            <input type="text" name="wj_math_range" id="wj_math_range" value={formData.wj_math_range || ''} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Sub-Step 3: WJ IV Standard Battery Subtests */}
+                  {currentSubStep === 3 && (
+                  <div className="p-4 border border-border rounded-md animate-fadeIn">
+                    <h3 className="text-lg font-semibold mb-3 text-gold">Woodcock-Johnson IV - Standard Battery Subtests</h3>
+                    <div className="space-y-3">
+                      {standardSubtests.map(subtest => (
+                        <div key={subtest.id} className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                          <h4 className="font-medium text-sm mb-2">{subtest.name}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label htmlFor={`wj_${subtest.id}_ss`} className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                              <input
+                                type="number"
+                                name={`wj_${subtest.id}_ss`}
+                                id={`wj_${subtest.id}_ss`}
+                                value={formData[`wj_${subtest.id}_ss` as keyof FormData] || ''}
+                                onChange={handleInputChange}
+                                className="w-full p-1.5 border border-border rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`wj_${subtest.id}_pr`} className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                              <input
+                                type="number"
+                                name={`wj_${subtest.id}_pr`}
+                                id={`wj_${subtest.id}_pr`}
+                                value={formData[`wj_${subtest.id}_pr` as keyof FormData] || ''}
+                                onChange={handleInputChange}
+                                className="w-full p-1.5 border border-border rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-6 mb-4">
+                      <label htmlFor="includeExtendedBattery" className="flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          name="includeExtendedBattery"
+                          id="includeExtendedBattery"
+                          checked={formData.includeExtendedBattery || false}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-gold border-border rounded focus:ring-gold"
+                        />
+                        <span className="ml-2 text-sm font-medium text-text-primary">Include Extended Battery Subtests?</span>
+                      </label>
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Sub-Step 4: Extended Battery (if enabled) */}
+                  {currentSubStep === 4 && formData.includeExtendedBattery && (
+                  <div className="p-4 border border-border rounded-md animate-fadeIn">
+                    <h3 className="text-lg font-semibold mb-3 text-gold">Woodcock-Johnson IV - Extended Battery Subtests</h3>
+                    <div className="space-y-3">
+                      {extendedSubtests.map(subtest => (
+                        <div key={subtest.id} className="p-3 border border-border-secondary rounded bg-bg-secondary">
+                          <h4 className="font-medium text-sm mb-2">{subtest.name}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label htmlFor={`wj_${subtest.id}_ss`} className="block text-xs font-medium mb-1">Standard Score (SS)</label>
+                              <input
+                                type="number"
+                                name={`wj_${subtest.id}_ss`}
+                                id={`wj_${subtest.id}_ss`}
+                                value={formData[`wj_${subtest.id}_ss` as keyof FormData] || ''}
+                                onChange={handleInputChange}
+                                className="w-full p-1.5 border border-border rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`wj_${subtest.id}_pr`} className="block text-xs font-medium mb-1">Percentile Rank (PR)</label>
+                              <input
+                                type="number"
+                                name={`wj_${subtest.id}_pr`}
+                                id={`wj_${subtest.id}_pr`}
+                                value={formData[`wj_${subtest.id}_pr` as keyof FormData] || ''}
+                                onChange={handleInputChange}
+                                className="w-full p-1.5 border border-border rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Sub-Step 5: Narrative Sections */}
+                  {currentSubStep === 5 && (
+                  <div className="p-4 border border-border rounded-md animate-fadeIn">
+                    <h3 className="text-lg font-semibold mb-3 text-gold">Narrative Sections</h3>
+                    <div className="space-y-6">
+                      <div>
+                        <label htmlFor="reasonForReferral" className="block text-sm font-medium mb-2">Reason for Referral</label>
+                        <textarea
+                          name="reasonForReferral"
+                          id="reasonForReferral"
+                          rows={3}
+                          value={formData.reasonForReferral || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Describe the reason for referral..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="backgroundInfo" className="block text-sm font-medium mb-2">Background Information</label>
+                        <textarea
+                          name="backgroundInfo"
+                          id="backgroundInfo"
+                          rows={4}
+                          value={formData.backgroundInfo || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Provide relevant background information..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="assessmentInstruments" className="block text-sm font-medium mb-2">Assessment Instruments Administered</label>
+                        <textarea
+                          name="assessmentInstruments"
+                          id="assessmentInstruments"
+                          rows={3}
+                          value={formData.assessmentInstruments || 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\n'}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="List all assessment instruments used..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="behavioralObservations" className="block text-sm font-medium mb-2">Behavioral Observations</label>
+                        <textarea
+                          name="behavioralObservations"
+                          id="behavioralObservations"
+                          rows={4}
+                          value={formData.behavioralObservations || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Describe observations during assessment..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="narrativeInterpretation" className="block text-sm font-medium mb-2">Narrative Interpretation of Academic Scores</label>
+                        <textarea
+                          name="narrativeInterpretation"
+                          id="narrativeInterpretation"
+                          rows={5}
+                          value={formData.narrativeInterpretation || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Provide interpretation of academic scores..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="summaryOfFindings" className="block text-sm font-medium mb-2">Summary of Findings</label>
+                        <textarea
+                          name="summaryOfFindings"
+                          id="summaryOfFindings"
+                          rows={4}
+                          value={formData.summaryOfFindings || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Summarize key findings from assessment..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="recommendations" className="block text-sm font-medium mb-2">Recommendations</label>
+                        <textarea
+                          name="recommendations"
+                          id="recommendations"
+                          rows={4}
+                          value={formData.recommendations || ''}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+                          placeholder="Provide academic recommendations..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Sub-Step Navigation */}
+                  <div className="flex justify-between items-center mt-8 pt-4 border-t border-border">
+                    <button 
+                      onClick={() => {
+                        if (currentSubStep === 1) {
+                          setCurrentStep(1);
+                        } else {
+                          if (currentSubStep === 5 && !formData.includeExtendedBattery) {
+                            setCurrentSubStep(3);
+                          } else {
+                            setCurrentSubStep(prev => prev - 1);
+                          }
+                        }
+                      }} 
+                      className="btn border border-border hover:bg-bg-secondary"
+                    >
+                      Back
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (currentSubStep === 3 && !formData.includeExtendedBattery) {
+                          setCurrentSubStep(5);
+                        } else if (currentSubStep < 5) {
+                          setCurrentSubStep(prev => prev + 1);
+                        } else if (currentSubStep === 5) {
+                          setCurrentStep(3);
+                          setCurrentSubStep(1);
+                        }
+                      }}
+                      className="btn bg-accent-gold text-black"
+                    >
+                      {currentSubStep === 5 ? 'Review Report' : 
+                       formData.includeExtendedBattery && currentSubStep === 4 ? 'Next: Narrative' :
+                       currentSubStep === 3 && !formData.includeExtendedBattery ? 'Next: Narrative' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {selectedTemplateId === 'cognitive-processing' && (
+                <div className="p-4 border border-border rounded-md">
+                  <h3 className="text-lg font-semibold mb-3 text-gold">Cognitive Processing - Score Input</h3>
+                  <p className="text-text-secondary">Score input fields for Cognitive Processing reports will go here.</p>
+                </div>
+              )}
+
+              {selectedTemplateId === 'speech-language' && (
+                <div className="p-4 border border-border rounded-md">
+                  <h3 className="text-lg font-semibold mb-3 text-gold">Speech & Language - Score Input</h3>
+                  <p className="text-text-secondary">Score input fields for Speech & Language reports will go here.</p>
+                </div>
+              )}
+
+              {!['academic-achievement', 'cognitive-processing', 'speech-language'].includes(selectedTemplateId || '') && selectedFile && (
+                <div className="p-4 border border-border rounded-md">
+                  <h3 className="text-lg font-semibold mb-3 text-gold">Uploaded File: {selectedFile.name}</h3>
+                  <p className="text-text-secondary">Placeholder for displaying parsed template fields and score input for uploaded files.</p>
+                </div>
               )}
             </div>
-          ))}
-        </div>
-        <div className="flex justify-between items-center mt-8 pt-4 border-t border-border">
-          <button onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSearchParams({});}} className="btn border-border">Back to Templates</button>
-          <button onClick={() => setCurrentStep(3)} className="btn bg-accent-gold text-black">Review Report</button>
-        </div>
-      </div>
-    );
-  }
-
-  // Step 3: Review & Finalize
-  if (currentStep === 3) {
-     let contentToUse: string | undefined;
-     let templateNameForDisplay: string | undefined;
-     let placeholdersForCustom: string[] | undefined;
-
-     if (isCustomTemplateFlow && customContent) {
-         contentToUse = customContent;
-         templateNameForDisplay = customName || "Custom Report";
-         placeholdersForCustom = customPlaceholders;
-     } else if (selectedTemplateId && templateCategories) {
-         const category = templateCategories.find(c => c.subTemplates.some(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId));
-         const subTemplate = category?.subTemplates.find(st => st.id === selectedTemplateId || st.sub_template_id === selectedTemplateId);
-         contentToUse = subTemplate?.content;
-         templateNameForDisplay = subTemplate?.name;
-         // For predefined, populateTemplate will use Object.keys(formData) against UPPER_SNAKE_CASE placeholders
-     }
-    return (
-        <div className="animate-fadeIn card">
+          </>
+        )}
+        
+        {currentStep === 3 && (
+          <>
             <h2 className="text-xl font-medium mb-4">Step 3: Review & Finalize Report</h2>
-            <div className="mb-6 p-4 border rounded-md bg-bg-secondary"><h3 className="text-lg font-semibold text-gold mb-1">Report Type: {templateNameForDisplay || 'N/A'}</h3><p className="text-sm text-text-secondary">Student: {formData.studentName || 'N/A'}</p></div>
-            <div className="mb-4"><h4 className="text-md font-medium mb-2 text-text-primary">Populated Report Preview:</h4>
-                <div className="p-3 border border-border rounded-md bg-bg-primary max-h-[50vh] overflow-y-auto text-sm">
-                    {contentToUse ? (
-                        isCustomTemplateFlow ? 
-                        <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: populateTemplate(contentToUse, formData, placeholdersForCustom)}} />
-                        : <pre className="whitespace-pre-wrap">{populateTemplate(contentToUse, formData)}</pre>
-                    ) : <p className="text-text-secondary italic">No content to preview.</p>}
+            <p className="text-text-secondary mb-6">
+              Review your populated report template below. You can make final edits or generate the final document.
+            </p>
+            
+            <div className="space-y-6">
+              <div className="p-4 border border-border rounded-md">
+                <h3 className="text-lg font-semibold mb-3 text-gold">Populated Report Preview</h3>
+                {(() => {
+                  if (!selectedTemplateId) {
+                    return <p className="text-red-500">No template selected.</p>;
+                  }
+                  const currentTemplateObject = fullTemplatesData.find(t => t.id === selectedTemplateId);
+                  if (!currentTemplateObject) {
+                    return <p className="text-red-500">Error: Template content not found for ID: {selectedTemplateId}</p>;
+                  }
+                  const reportText = populateTemplate(currentTemplateObject.content, formData);
+                  return (
+                    <pre className="whitespace-pre-wrap text-sm leading-relaxed bg-bg-primary p-4 border border-border rounded-md max-h-[60vh] overflow-y-auto">
+                      {reportText}
+                    </pre>
+                  );
+                })()}
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t border-border">
+                <button 
+                  onClick={() => {
+                    setCurrentStep(2);
+                    setCurrentSubStep(5);
+                  }} 
+                  className="btn border border-border hover:bg-bg-secondary"
+                >
+                  Back to Edit Data
+                </button>
+                <div className="flex gap-3">
+                  <button className="btn border border-border hover:bg-bg-secondary">
+                    Save as Draft
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (selectedTemplateId) {
+                        const studentNameSanitized = (formData.studentName || 'Student').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+                        const filename = `${studentNameSanitized}_${selectedTemplateId}_Report.docx`;
+                        await downloadDocxFile(filename, formData, selectedTemplateId);
+                      } else {
+                        alert("Error: No template selected for download.");
+                      }
+                    }}
+                    className="btn bg-accent-teal"
+                  >
+                    Download Report (.docx)
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (selectedTemplateId && formData.studentName) {
+                        const currentTemplateObject = fullTemplatesData.find(t => t.id === selectedTemplateId);
+                        if (currentTemplateObject) {
+                          const reportText = populateTemplate(currentTemplateObject.content, formData);
+                          
+                          const newReportToAdd: Report = {
+                            // id will be generated by addReport in context
+                            id: 0, // Temporary, will be overwritten
+                            name: `${formData.studentName} - ${currentTemplateObject.name}`,
+                            type: currentTemplateObject.name, // Or selectedTemplateId for a more programmatic type
+                            date: new Date().toISOString().split('T')[0], // Today's date
+                            status: 'Completed', // Or 'Draft' if you prefer
+                            content: reportText,
+                            formData: { ...formData } // Store a copy of the form data
+                          };
+                          
+                          addReport(newReportToAdd);
+                          navigate('/reports'); // Navigate back to the reports list
+                        } else {
+                          alert("Error: Could not find template information to save the report.");
+                        }
+                      } else {
+                        alert("Error: Student name and template are required to save the report.");
+                      }
+                    }}
+                    className="btn bg-accent-gold text-black"
+                  >
+                    Generate Final Report
+                  </button>
                 </div>
+              </div>
             </div>
-            <div className="flex justify-between items-center mt-6 pt-4 border-t border-border">
-                <button onClick={() => setCurrentStep(2)} className="btn border-border">Back to Edit</button>
-                <div className="flex gap-2">
-                    <button onClick={() => saveDraft(getDraftKey(), {formData, selectedTemplateId, currentStep, currentSubStep:1, selectedCategoryId})} className="btn border-border">Save Draft</button>
-                    <button onClick={downloadDocxFile} className="btn bg-accent-teal">Download DOCX</button>
-                    <button onClick={handleFinalizeReport} className="btn bg-accent-gold text-black">Save to My Reports</button>
-                </div>
-            </div>
-        </div>
-      );
-  }
-
-  return <div className="text-center p-8">Loading or invalid page state...</div>;
+          </>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default CreateReportPage;
