@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Save, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Save, Eye, EyeOff, ChevronDown, ChevronUp, BookOpen, Brain, MessageCircle, Loader2 } from 'lucide-react';
 import { useReports } from '../context/ReportContext';
 
 // Updated FormData interface with index signature for dynamic keys
@@ -58,6 +58,14 @@ const CreateReportPage: React.FC = () => {
   const [generatedReport, setGeneratedReport] = useState<string>('');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  
+  // Icon mapping for template categories
+  const iconMap: { [key: string]: React.ComponentType<any> } = {
+    BookOpen: BookOpen,
+    Brain: Brain,
+    MessageCircle: MessageCircle,
+  };
+  const FileTextIcon = FileText; // Default fallback icon
   
   // Mock data for template categories and sub-templates
   const [templateCategories] = useState<TemplateCategory[]>([
@@ -179,6 +187,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   const [isLoadingTemplates] = useState(false);
   const routeState = location.state;
   const isCustomTemplateFlow = routeState?.customTemplateContent;
+  const currentAction = searchParams.get('action');
 
   // Initialize from URL params or route state
   useEffect(() => {
@@ -444,70 +453,114 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
           <h1 className="text-2xl font-medium">Create New Report</h1>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-medium mb-4">Choose Report Template</h2>
-            <p className="text-text-secondary">Select a category and template to get started</p>
-          </div>
-
-          {/* Categories */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {templateCategories.map(category => (
-              <button
-                key={category.id}
-                onClick={() => handleCategorySelect(category.category_id)}
-                className={`p-6 border rounded-lg text-left transition-all ${
-                  selectedCategoryId === category.category_id
-                    ? 'border-gold bg-gold bg-opacity-10'
-                    : 'border-border hover:border-gold hover:bg-gold hover:bg-opacity-5'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="text-gold" size={24} />
-                  <h3 className="font-medium text-lg">{category.category_name}</h3>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  {category.category_description}
+        <div className="card max-w-4xl mx-auto">
+          {currentAction === 'upload' ? (
+            // Upload UI
+            <div className="animate-fadeIn">
+              <div className="flex items-center mb-6">
+                <button 
+                  onClick={() => { 
+                    setSearchParams({}); 
+                    setSelectedCategoryId(''); 
+                    setSelectedTemplateId(''); 
+                  }} 
+                  className="btn border border-border hover:bg-bg-secondary mr-4 flex items-center gap-1"
+                >
+                  <ArrowLeft size={16}/> Back to Categories
+                </button>
+                <h2 className="text-xl font-medium">Upload Custom Template</h2>
+              </div>
+              <div className="text-center py-12">
+                <FileText className="text-gold mx-auto mb-4" size={64} />
+                <h3 className="text-xl font-medium mb-4">Upload Your Template File</h3>
+                <p className="text-text-secondary mb-8 max-w-md mx-auto">
+                  Upload a .docx file to create a custom template with placeholders
                 </p>
-              </button>
-            ))}
-          </div>
-
-          {/* Templates */}
-          {selectedCategoryId && (
-            <div className="mb-8">
-              <h3 className="text-xl font-medium mb-4">Select Template</h3>
+                <div className="border-2 border-dashed border-border rounded-lg p-8 hover:border-gold transition-colors">
+                  <p className="text-text-secondary">Drag & drop your .docx file here or click to browse</p>
+                </div>
+              </div>
+            </div>
+          ) : selectedCategoryId && !selectedTemplateId ? (
+            // Sub-Template Selection UI
+            <div className="animate-fadeIn">
+              <div className="flex items-center mb-6">
+                <button 
+                  onClick={() => setSelectedCategoryId('')} 
+                  className="btn border border-border hover:bg-bg-secondary mr-4 flex items-center gap-1"
+                >
+                  <ArrowLeft size={16}/> Back to Categories
+                </button>
+                <h2 className="text-xl font-medium">
+                  Choose from: {templateCategories?.find(c => c.category_id === selectedCategoryId)?.category_name || 'Category'}
+                </h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {getSelectedCategoryTemplates().map(template => (
+                {getSelectedCategoryTemplates().map((subTemplate) => (
                   <button
-                    key={template.id}
-                    onClick={() => handleTemplateSelect(template.sub_template_id)}
-                    className={`p-4 border rounded-lg text-left transition-all ${
-                      selectedTemplateId === template.sub_template_id
-                        ? 'border-gold bg-gold bg-opacity-10'
-                        : 'border-border hover:border-gold hover:bg-gold hover:bg-opacity-5'
-                    }`}
+                    key={subTemplate.id}
+                    onClick={() => {
+                      setSearchParams({ template: subTemplate.sub_template_id });
+                    }}
+                    className="text-left p-5 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary"
                   >
-                    <h4 className="font-medium mb-2">{template.name}</h4>
-                    <p className="text-sm text-text-secondary">
-                      {template.description}
-                    </p>
+                    <h4 className="font-semibold text-md text-text-primary mb-1">{subTemplate.name}</h4>
+                    <p className="text-xs text-text-secondary line-clamp-2">{subTemplate.description}</p>
+                    <div className="mt-3 flex items-center text-gold text-xs font-medium">
+                        <span>Use this Specific Template</span>
+                        <ArrowRight size={14} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Next Button */}
-          {selectedTemplateId && (
-            <div className="flex justify-end">
-              <button
-                onClick={handleNextStep}
-                className="btn bg-accent-gold text-black flex items-center gap-2"
-              >
-                Continue to Form
-                <ArrowRight size={16} />
-              </button>
+          ) : !selectedTemplateId ? (
+            // Default: Show Categories
+            <div className="animate-fadeIn">
+              <h2 className="text-xl font-medium mb-6 text-center">Step 1: Choose a Report Category</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {templateCategories?.map((category) => {
+                  const IconComponent = category.icon_name ? iconMap[category.icon_name] || FileTextIcon : FileTextIcon;
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => {
+                        setSelectedCategoryId(category.category_id);
+                      }}
+                      className="text-left p-6 border border-border rounded-lg hover:border-gold hover:shadow-lg transition-all group bg-bg-primary"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <IconComponent className="text-gold group-hover:scale-110 transition-transform" size={28} />
+                        <h3 className="font-semibold text-lg text-text-primary">{category.category_name}</h3>
+                      </div>
+                      <p className="text-sm text-text-secondary mb-4">{category.category_description}</p>
+                      <div className="mt-auto flex items-center text-gold text-sm font-medium">
+                        <span>View Templates</span>
+                        <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-10 pt-6 border-t border-border text-center">
+                <p className="text-text-secondary mb-3">Or, if you have your own template file:</p>
+                <button 
+                  className="btn border border-border hover:border-gold text-gold"
+                  onClick={() => {
+                    setSelectedCategoryId(''); 
+                    setSelectedTemplateId('');
+                    setSearchParams({action: 'upload'}); 
+                  }}
+                >
+                  Upload a Custom Template File
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Loading state when selectedTemplateId is set from URL
+            <div className="text-center p-6">
+                <Loader2 className="h-8 w-8 animate-spin text-gold mx-auto mb-2" />
+                <p className="text-text-secondary">Loading template: {selectedTemplateId}...</p>
             </div>
           )}
         </div>
