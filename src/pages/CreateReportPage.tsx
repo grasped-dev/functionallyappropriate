@@ -46,7 +46,7 @@ interface SubTemplate {
 }
 
 const CreateReportPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { addReport } = useReports();
