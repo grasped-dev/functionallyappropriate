@@ -72,7 +72,7 @@ const GoalWriting: React.FC = () => {
       id: 0,
       title: 'Student Information',
       description: 'Provide general student details, math observations, previous goal progress, and any existing assessment data.',
-      icon: <Target className="text-green" size={24} />,
+      icon: <Target className="text-green\" size={24} />,
     },
     {
       id: 1,
@@ -84,7 +84,7 @@ const GoalWriting: React.FC = () => {
       id: 2,
       title: 'Goal Parameters',
       description: 'Define the specific area and target behavior',
-      icon: <FileText className="text-green" size={24} />,
+      icon: <FileText className="text-green\" size={24} />,
     },
     {
       id: 3,
