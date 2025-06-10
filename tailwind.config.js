@@ -40,5 +40,7 @@ export default {
       sans: ['Roboto', 'sans-serif'],
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 };

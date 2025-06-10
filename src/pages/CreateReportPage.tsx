@@ -3,6 +3,47 @@ import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Save, Eye, EyeOff, ChevronDown, ChevronUp, BookOpen, Brain, MessageCircle, Loader2 } from 'lucide-react';
 import { useReports } from '../context/ReportContext';
 
+// Utility function to convert basic Markdown-like text to HTML
+const markdownToBasicHtml = (markdownText: string): string => {
+  if (!markdownText) return '';
+  return markdownText
+    .split('\n') // Split by actual newlines
+    .map(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('### ')) return `<h3>${trimmed.substring(4)}</h3>`;
+      if (trimmed.startsWith('## ')) return `<h2>${trimmed.substring(3)}</h2>`;
+      if (trimmed.startsWith('# ')) return `<h1>${trimmed.substring(2)}</h1>`;
+      if (trimmed.startsWith('- ')) return `<ul><li>${trimmed.substring(2)}</li></ul>`;
+      if (trimmed === '') return '<br>';
+      // Basic bold with **text**
+      const boldedLine = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      return `<p>${boldedLine}</p>`;
+    })
+    .join('');
+};
+
+// Utility function to populate template with form data
+const populateTemplate = (template: string, formData: FormData, placeholderKeys?: string[]): string => {
+  let result = template;
+  
+  // Replace placeholders with form data
+  Object.entries(formData).forEach(([key, value]) => {
+    // Convert camelCase back to UPPER_SNAKE_CASE for placeholder replacement
+    const placeholderKey = key.replace(/([A-Z])/g, '_$1').toUpperCase();
+    const placeholder = `[${placeholderKey}]`;
+    
+    if (typeof value === 'string') {
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+    } else if (typeof value === 'boolean') {
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value ? 'Yes' : 'No');
+    } else if (typeof value === 'number') {
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value.toString());
+    }
+  });
+  
+  return result;
+};
+
 // Updated FormData interface with index signature for dynamic keys
 interface FormData {
   studentName?: string; // Example of a common, optional predefined key
@@ -846,21 +887,53 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
         </div>
 
         <div className="card">
-          {isPreviewMode ? (
-            <div className="prose max-w-none">
-              <div 
-                className="whitespace-pre-wrap font-mono text-sm leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: generatedReport.replace(/\n/g, '<br>') }}
-              />
-            </div>
-          ) : (
-            <textarea
-              value={generatedReport}
-              onChange={(e) => setGeneratedReport(e.target.value)}
-              className="w-full h-96 p-4 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold font-mono text-sm"
-              placeholder="Generated report will appear here..."
-            />
-          )}
+          <div className="border border-border rounded-lg p-6 bg-bg-primary max-h-[60vh] overflow-y-auto">
+            {(() => {
+              let contentToUse: string | undefined;
+              let currentPlaceholders: string[] | undefined;
+
+              if (isCustomTemplateFlow && routeState?.customTemplateContent) {
+                contentToUse = routeState.customTemplateContent;
+                currentPlaceholders = routeState.customTemplatePlaceholders;
+              } else if (selectedTemplateId && templateCategories) {
+                const category = templateCategories.find(c => 
+                  subTemplates.some(st => st.category_table_id === c.id && st.sub_template_id === selectedTemplateId)
+                );
+                const subTemplate = subTemplates.find(st => 
+                  st.category_table_id === category?.id && st.sub_template_id === selectedTemplateId
+                );
+                contentToUse = subTemplate?.content;
+                // For predefined, populateTemplate derives placeholders from formData keys if not explicitly given
+              }
+
+              if (!contentToUse) {
+                return <p className="text-text-secondary italic">No template content available for preview.</p>;
+              }
+
+              const populatedText = populateTemplate(contentToUse, formData, isCustomTemplateFlow ? currentPlaceholders : undefined);
+
+              if (isPreviewMode) {
+                if (isCustomTemplateFlow) {
+                  // Custom templates are already HTML (from Quill)
+                  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: populatedText }} />;
+                } else {
+                  // Predefined templates (Markdown-like)
+                  const htmlPreview = markdownToBasicHtml(populatedText);
+                  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
+                }
+              } else {
+                // Edit mode - show as textarea
+                return (
+                  <textarea
+                    value={populatedText}
+                    onChange={(e) => setGeneratedReport(e.target.value)}
+                    className="w-full h-96 p-4 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold font-mono text-sm resize-none"
+                    placeholder="Generated report will appear here..."
+                  />
+                );
+              }
+            })()}
+          </div>
         </div>
       </div>
     </div>
