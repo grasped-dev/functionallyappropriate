@@ -40,7 +40,25 @@ const GoalWriting: React.FC = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [wizardData, setWizardData] = useState({
-    studentInfo: '',
+    // General Student Information
+    studentName: '',
+    gradeLevel: 'K',
+    schoolName: '',
+    disabilityCategory: '',
+    studentDisposition: '',
+    mathObservations: '',
+    
+    // Previous IEP Goal in Math
+    previousGoalText: '',
+    previousGoalCriteria: '',
+    previousGoalProgress: '',
+    previousGoalStrategies: '',
+    
+    // Existing Assessment Data
+    broadAssessmentSummary: '',
+    specificAssessmentNotes: '',
+    
+    // Legacy fields for other steps
     assessmentData: '',
     goalArea: '',
     currentPerformance: '',
@@ -53,8 +71,8 @@ const GoalWriting: React.FC = () => {
     {
       id: 0,
       title: 'Student Information',
-      description: 'Tell us about the student and their current needs',
-      icon: <Target className="text-green\" size={24} />,
+      description: 'Provide general student details, math observations, previous goal progress, and any existing assessment data.',
+      icon: <Target className="text-green" size={24} />,
     },
     {
       id: 1,
@@ -66,7 +84,7 @@ const GoalWriting: React.FC = () => {
       id: 2,
       title: 'Goal Parameters',
       description: 'Define the specific area and target behavior',
-      icon: <FileText className="text-green\" size={24} />,
+      icon: <FileText className="text-green" size={24} />,
     },
     {
       id: 3,
@@ -89,11 +107,31 @@ const GoalWriting: React.FC = () => {
     'Gross Motor',
   ];
 
+  const gradeOptions = ['K', '1st', '2nd', '3rd', '4th', '5th'];
+
   const handleStartWizard = () => {
     setShowWizard(true);
     setCurrentStep(0);
     setWizardData({
-      studentInfo: '',
+      // General Student Information
+      studentName: '',
+      gradeLevel: 'K',
+      schoolName: '',
+      disabilityCategory: '',
+      studentDisposition: '',
+      mathObservations: '',
+      
+      // Previous IEP Goal in Math
+      previousGoalText: '',
+      previousGoalCriteria: '',
+      previousGoalProgress: '',
+      previousGoalStrategies: '',
+      
+      // Existing Assessment Data
+      broadAssessmentSummary: '',
+      specificAssessmentNotes: '',
+      
+      // Legacy fields for other steps
       assessmentData: '',
       goalArea: '',
       currentPerformance: '',
@@ -147,17 +185,192 @@ const GoalWriting: React.FC = () => {
     switch (currentStep) {
       case 0:
         return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-green">
-                Student Information & Current Needs
-              </label>
-              <textarea
-                value={wizardData.studentInfo}
-                onChange={e => setWizardData({...wizardData, studentInfo: e.target.value})}
-                className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-32"
-                placeholder="Describe the student's current educational needs, strengths, and areas of concern. Include grade level, disability category, and any relevant background information..."
-              />
+          <div className="space-y-8">
+            {/* Section 1: General Student Information */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-green border-b border-green border-opacity-20 pb-2">
+                General Student Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Student Name (or AI for Pseudonym):
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.studentName}
+                    onChange={e => setWizardData({...wizardData, studentName: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                    placeholder="Enter student name or 'AI' for pseudonym"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Current Grade Level:
+                  </label>
+                  <select
+                    value={wizardData.gradeLevel}
+                    onChange={e => setWizardData({...wizardData, gradeLevel: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                  >
+                    {gradeOptions.map(grade => (
+                      <option key={grade} value={grade}>{grade}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    School Name (optional):
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.schoolName}
+                    onChange={e => setWizardData({...wizardData, schoolName: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                    placeholder="Enter school name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Disability Category (for IEP context):
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.disabilityCategory}
+                    onChange={e => setWizardData({...wizardData, disabilityCategory: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                    placeholder="e.g., Autism, SLD, ID, etc."
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Student's general disposition, interests, and helpful classroom supports:
+                </label>
+                <textarea
+                  value={wizardData.studentDisposition}
+                  onChange={e => setWizardData({...wizardData, studentDisposition: e.target.value})}
+                  className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-24"
+                  placeholder="Describe the student's personality, interests, learning preferences, and what supports help them succeed in the classroom..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Anecdotal observations in math class:
+                </label>
+                <textarea
+                  value={wizardData.mathObservations}
+                  onChange={e => setWizardData({...wizardData, mathObservations: e.target.value})}
+                  className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-24"
+                  placeholder="Share specific observations about the student's performance, behavior, and engagement during math instruction..."
+                />
+              </div>
+            </div>
+
+            {/* Section 2: Previous IEP Goal in Math */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-green border-b border-green border-opacity-20 pb-2">
+                Previous IEP Goal in Math
+              </h3>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Most recent annual IEP math goal (or copy/paste):
+                </label>
+                <textarea
+                  value={wizardData.previousGoalText}
+                  onChange={e => setWizardData({...wizardData, previousGoalText: e.target.value})}
+                  className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-32"
+                  placeholder="Copy and paste the exact text of the student's most recent math IEP goal, or describe it in detail..."
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Target mastery criteria for that goal (e.g., 80% accuracy):
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.previousGoalCriteria}
+                    onChange={e => setWizardData({...wizardData, previousGoalCriteria: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                    placeholder="e.g., 80% accuracy, 4 out of 5 trials"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Performance on last progress report for that goal:
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.previousGoalProgress}
+                    onChange={e => setWizardData({...wizardData, previousGoalProgress: e.target.value})}
+                    className="w-full p-3 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200"
+                    placeholder="e.g., Met 60% of target, Progressing"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Effective strategies/supports for previous goal:
+                </label>
+                <textarea
+                  value={wizardData.previousGoalStrategies}
+                  onChange={e => setWizardData({...wizardData, previousGoalStrategies: e.target.value})}
+                  className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-24"
+                  placeholder="Describe what teaching strategies, accommodations, or supports were most effective for this student's previous math goal..."
+                />
+              </div>
+            </div>
+
+            {/* Section 3: Existing Assessment Data */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-green border-b border-green border-opacity-20 pb-2">
+                Existing Assessment Data
+              </h3>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Summary of broad math assessments (NWEA/MAP, benchmarks):
+                </label>
+                <textarea
+                  value={wizardData.broadAssessmentSummary}
+                  onChange={e => setWizardData({...wizardData, broadAssessmentSummary: e.target.value})}
+                  className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-24"
+                  placeholder="Summarize results from standardized assessments like NWEA/MAP, district benchmarks, or other broad math assessments..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-green">
+                  Specific Progress Monitoring / Curriculum-Based Assessments:
+                </label>
+                <div className="mb-2">
+                  <label className="block text-sm font-medium mb-2 text-green">
+                    Manually Enter Key Assessment Notes/Scores:
+                  </label>
+                  <textarea
+                    value={wizardData.specificAssessmentNotes}
+                    onChange={e => setWizardData({...wizardData, specificAssessmentNotes: e.target.value})}
+                    className="w-full p-4 border-2 border-green border-opacity-20 rounded-lg bg-bg-primary focus:outline-none focus:border-green focus:border-opacity-60 transition-all duration-200 h-32"
+                    placeholder="Enter detailed notes from progress monitoring data, curriculum-based assessments, work samples, or other specific math evaluations. Include scores, dates, and observations..."
+                  />
+                </div>
+                <p className="text-xs text-text-secondary italic">
+                  Note: File upload functionality for assessment documents will be available in future updates.
+                </p>
+              </div>
             </div>
           </div>
         );
