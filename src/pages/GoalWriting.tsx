@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Plus, Save, Trash2, ArrowRight, ArrowLeft, Check, Sparkles, Brain, FileText, Calendar } from 'lucide-react';
+import { Target, Plus, Save, Trash2, ArrowRight, ArrowLeft, Check, Sparkles, Brain, FileText, Calendar, Lightbulb } from 'lucide-react';
 
 interface Goal {
   id: number;
@@ -54,7 +54,7 @@ const GoalWriting: React.FC = () => {
       id: 0,
       title: 'Student Information',
       description: 'Tell us about the student and their current needs',
-      icon: <Target className="text-green\" size={24} />,
+      icon: <Target className="text-green" size={24} />,
     },
     {
       id: 1,
@@ -66,7 +66,7 @@ const GoalWriting: React.FC = () => {
       id: 2,
       title: 'Goal Parameters',
       description: 'Define the specific area and target behavior',
-      icon: <FileText className="text-green\" size={24} />,
+      icon: <FileText className="text-green" size={24} />,
     },
     {
       id: 3,
@@ -391,7 +391,7 @@ const GoalWriting: React.FC = () => {
       </div>
       
       {/* Current Goals */}
-      <div className="card">
+      <div className="card mb-8">
         <div className="flex items-center gap-2 mb-6">
           <Target className="text-green" size={24} />
           <h2 className="text-2xl font-medium">Current IEP Goals</h2>
@@ -458,6 +458,113 @@ const GoalWriting: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* SMART Goal Writing Tips Section */}
+      <div className="card bg-gradient-to-br from-green from-opacity-5 to-green to-opacity-10 border-green border-opacity-30">
+        <div className="flex items-center gap-3 mb-6">
+          <Lightbulb className="text-green" size={22} />
+          <h2 className="text-2xl font-medium">SMART Goal Writing Tips</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-bg-primary rounded-lg p-5 border border-green border-opacity-20 hover:border-opacity-40 transition-all duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center font-bold text-sm">
+                S
+              </div>
+              <h3 className="font-semibold text-green">Specific</h3>
+            </div>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Clearly define what needs to be accomplished. Avoid vague language and be precise about the expected behavior or skill.
+            </p>
+          </div>
+
+          <div className="bg-bg-primary rounded-lg p-5 border border-green border-opacity-20 hover:border-opacity-40 transition-all duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center font-bold text-sm">
+                M
+              </div>
+              <h3 className="font-semibold text-green">Measurable</h3>
+            </div>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              How will you track progress and know when the goal is met? Include specific criteria like percentages or frequency.
+            </p>
+          </div>
+
+          <div className="bg-bg-primary rounded-lg p-5 border border-green border-opacity-20 hover:border-opacity-40 transition-all duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center font-bold text-sm">
+                A
+              </div>
+              <h3 className="font-semibold text-green">Achievable</h3>
+            </div>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Is the goal realistic given the student's current abilities and expected growth? Set challenging but attainable targets.
+            </p>
+          </div>
+
+          <div className="bg-bg-primary rounded-lg p-5 border border-green border-opacity-20 hover:border-opacity-40 transition-all duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center font-bold text-sm">
+                R
+              </div>
+              <h3 className="font-semibold text-green">Relevant</h3>
+            </div>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Does the goal address the student's key needs and align with curriculum expectations and life skills?
+            </p>
+          </div>
+
+          <div className="bg-bg-primary rounded-lg p-5 border border-green border-opacity-20 hover:border-opacity-40 transition-all duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center font-bold text-sm">
+                T
+              </div>
+              <h3 className="font-semibold text-green">Time-bound</h3>
+            </div>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              What is the target date for achieving this goal? Establish clear timelines for assessment and review.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 p-6 bg-bg-primary rounded-lg border border-green border-opacity-20">
+          <h3 className="font-semibold text-green mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            Additional Best Practices
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ul className="space-y-2 text-sm text-text-secondary">
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Use positive language focusing on what the student will do</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Include conditions under which the skill will be performed</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Consider the student's learning style and preferences</span>
+              </li>
+            </ul>
+            <ul className="space-y-2 text-sm text-text-secondary">
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Align goals with state standards when appropriate</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Ensure goals are functional and meaningful to the student</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green rounded-full mt-2 flex-shrink-0"></div>
+                <span>Plan for regular progress monitoring and data collection</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
