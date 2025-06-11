@@ -1405,5 +1405,3 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
 };
 
 export default CreateReportPage;
-
-export default CreateReportPage
