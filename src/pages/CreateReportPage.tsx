@@ -32,9 +32,11 @@ const CreateReportPage: React.FC = () => {
   // Add formatLabel utility function
   const formatLabel = (key: string): string => {
     if (!key) return '';
-    return key
+    // First, handle potential camelCase by inserting spaces before capitals
+    const spacedKey = key.replace(/([A-Z])/g, ' $1');
+    // Then, handle snake_case and general formatting
+    return spacedKey
       .replace(/_/g, ' ') 
-      .replace(/([A-Z])/g, ' $1') 
       .trim()
       .toLowerCase()
       .replace(/\b\w/g, char => char.toUpperCase()); 
@@ -236,7 +238,7 @@ const CreateReportPage: React.FC = () => {
       if (activeCustomPlaceholders && activeCustomPlaceholders.length > 0) {
         fieldsToRender = activeCustomPlaceholders.map(placeholderKeyFromModal => ({
           key: placeholderKeyFromModal.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase()),
-          label: formatLabel(placeholderKeyFromModal), // USE formatLabel
+          label: formatLabel(placeholderKeyFromModal), // USE formatLabel HERE
           type: 'textarea',
           placeholder: `Enter ${formatLabel(placeholderKeyFromModal).toLowerCase()}`
         }));
@@ -314,7 +316,7 @@ const CreateReportPage: React.FC = () => {
         if (subTemplate.placeholder_keys) {
           fieldsToRender = subTemplate.placeholder_keys.map(keyFromDB => ({
             key: keyFromDB.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase()),
-            label: formatLabel(keyFromDB), // USE formatLabel
+            label: formatLabel(keyFromDB), // USE formatLabel HERE
             type: keyFromDB.includes('DATE') || keyFromDB.includes('DOB') ? 'date' : 
                   (keyFromDB.includes('SS') || keyFromDB.includes('PR') || keyFromDB.includes('SCORE')) ? 'number' : 
                   'textarea',
