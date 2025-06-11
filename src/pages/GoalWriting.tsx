@@ -567,16 +567,7 @@ const GoalWriting: React.FC = () => {
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-medium">Goal Writing</h1>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => {/* Handle manual goal creation */}}
-            className="flex items-center gap-2 px-4 py-2 border border-green border-opacity-20 text-green rounded-lg hover:bg-green hover:bg-opacity-10 transition-all duration-200"
-          >
-            <Plus size={18} />
-            Manual Goal
-          </button>
-        </div>
+        <h1 className="text-3xl font-medium">IEP Goal Development Studio</h1>
       </div>
 
       {/* Hero Section */}
@@ -587,90 +578,19 @@ const GoalWriting: React.FC = () => {
               <Sparkles className="text-green" size={48} />
             </div>
           </div>
-          <h2 className="text-3xl font-medium mb-4">Create Goals with AI Assistance</h2>
+          <h2 className="text-3xl font-medium mb-4">AI-Assisted IEP Goal Development</h2>
           <p className="text-text-secondary text-lg mb-8 max-w-2xl mx-auto">
-            Let our AI help you craft comprehensive, measurable IEP goals based on student data and best practices. 
-            Simply provide information about your student, and we'll guide you through the process.
+            Use our AI-powered assistant to guide you through creating comprehensive, measurable Present Levels, Baselines, and IEP Goals for your students.
           </p>
           <button
             onClick={handleStartWizard}
             className="inline-flex items-center gap-3 px-8 py-4 bg-green text-white rounded-xl font-medium text-lg hover:bg-green hover:bg-opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
           >
             <Brain size={24} />
-            Start New AI-Assisted Goal Process
+            Create New Student IEP Goals
             <ArrowRight size={24} />
           </button>
         </div>
-      </div>
-      
-      {/* Current Goals */}
-      <div className="card mb-8">
-        <div className="flex items-center gap-2 mb-6">
-          <Target className="text-green" size={24} />
-          <h2 className="text-2xl font-medium">Current IEP Goals</h2>
-        </div>
-        
-        {goals.length > 0 ? (
-          <div className="space-y-4">
-            {goals.map(goal => (
-              <div key={goal.id} className="border border-border rounded-xl p-6 hover:border-green hover:border-opacity-40 transition-all duration-200 hover:shadow-md">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 bg-green bg-opacity-10 text-green text-sm rounded-full font-medium">
-                      {goal.area}
-                    </span>
-                    <span className={`px-3 py-1 text-xs rounded-full font-medium ${getStatusColor(goal.status)}`}>
-                      {goal.status.charAt(0).toUpperCase() + goal.status.slice(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      className="p-2 hover:bg-bg-secondary rounded-lg transition-colors" 
-                      aria-label="Edit goal"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                    </button>
-                    <button 
-                      className="p-2 hover:bg-bg-secondary rounded-lg transition-colors text-red-500" 
-                      onClick={() => handleDeleteGoal(goal.id)}
-                      aria-label="Delete goal"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="font-medium text-lg mb-2">Goal #{goal.id}</h3>
-                  <p className="text-text-secondary leading-relaxed">{goal.description}</p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-bg-secondary rounded-lg">
-                    <span className="font-medium text-green">Baseline:</span>
-                    <p className="text-sm mt-1">{goal.baseline}</p>
-                  </div>
-                  <div className="p-4 bg-bg-secondary rounded-lg">
-                    <span className="font-medium text-green">Target Date:</span>
-                    <p className="text-sm mt-1">{new Date(goal.targetDate).toLocaleDateString()}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12 text-text-secondary">
-            <Target size={48} className="mx-auto mb-4 opacity-30" />
-            <p className="text-lg mb-4">No goals have been created yet</p>
-            <button 
-              onClick={handleStartWizard}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-green text-white rounded-lg font-medium hover:bg-green hover:bg-opacity-90 transition-all duration-200"
-            >
-              <Sparkles size={20} />
-              Create Your First Goal
-            </button>
-          </div>
-        )}
       </div>
 
       {/* SMART Goal Writing Tips Section */}
