@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Save, Eye, EyeOff, ChevronDown, ChevronUp, BookOpen, Brain, MessageCircle, Loader2 } from 'lucide-react';
+import { useSearchParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Save, Eye, EyeOff, ChevronDown, ChevronUp, BookOpen, Brain, MessageCircle, Loader2, UploadCloud } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
 import { useReports } from '../context/ReportContext';
 
 // Utility function to convert basic Markdown-like text to HTML
 const markdownToBasicHtml = (markdownText: string): string => {
   if (!markdownText) return '';
   return markdownText
-    .split('\n') // Split by actual newlines
+    .split('\n')
     .map(line => {
       const trimmed = line.trim();
       if (trimmed.startsWith('### ')) return `<h3>${trimmed.substring(4)}</h3>`;
@@ -15,52 +18,95 @@ const markdownToBasicHtml = (markdownText: string): string => {
       if (trimmed.startsWith('# ')) return `<h1>${trimmed.substring(2)}</h1>`;
       if (trimmed.startsWith('- ')) return `<ul><li>${trimmed.substring(2)}</li></ul>`;
       if (trimmed === '') return '<br>';
-      // Basic bold with **text**
       const boldedLine = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       return `<p>${boldedLine}</p>`;
     })
     .join('');
 };
 
-// Utility function to populate template with form data
-const populateTemplate = (template: string, formData: FormData, placeholderKeys?: string[]): string => {
-  let result = template;
-  
-  // Replace placeholders with form data
-  Object.entries(formData).forEach(([key, value]) => {
-    // Convert camelCase back to UPPER_SNAKE_CASE for placeholder replacement
-    const placeholderKey = key.replace(/([A-Z])/g, '_$1').toUpperCase();
-    const placeholder = `[${placeholderKey}]`;
-    
-    if (typeof value === 'string') {
-      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
-    } else if (typeof value === 'boolean') {
-      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value ? 'Yes' : 'No');
-    } else if (typeof value === 'number') {
-      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value.toString());
-    }
-  });
-  
-  return result;
-};
-
-// Updated FormData interface with index signature for dynamic keys
+// Updated FormData interface with comprehensive fields
 interface FormData {
-  studentName?: string; // Example of a common, optional predefined key
-  dob?: string;         // Example
-  doe?: string;         // Example
+  // Basic student information
+  studentName?: string;
+  dob?: string;
+  doe?: string;
   grade?: string;
   examiner?: string;
+  
+  // Background sections
   reasonForReferral?: string;
   backgroundInfo?: string;
   assessmentInstruments?: string;
   behavioralObservations?: string;
+  
+  // WJIV Clusters
+  wj_broad_ss?: string;
+  wj_broad_pr?: string;
+  wj_broad_range?: string;
+  wj_reading_ss?: string;
+  wj_reading_pr?: string;
+  wj_reading_range?: string;
+  wj_written_ss?: string;
+  wj_written_pr?: string;
+  wj_written_range?: string;
+  wj_math_ss?: string;
+  wj_math_pr?: string;
+  wj_math_range?: string;
+  
+  // Standard Battery Subtests
+  wj_letter_word_ss?: string;
+  wj_letter_word_pr?: string;
+  wj_applied_problems_ss?: string;
+  wj_applied_problems_pr?: string;
+  wj_spelling_ss?: string;
+  wj_spelling_pr?: string;
+  wj_passage_comp_ss?: string;
+  wj_passage_comp_pr?: string;
+  wj_calculation_ss?: string;
+  wj_calculation_pr?: string;
+  wj_writing_samples_ss?: string;
+  wj_writing_samples_pr?: string;
+  wj_word_attack_ss?: string;
+  wj_word_attack_pr?: string;
+  wj_oral_reading_ss?: string;
+  wj_oral_reading_pr?: string;
+  wj_sent_read_flu_ss?: string;
+  wj_sent_read_flu_pr?: string;
+  wj_math_facts_flu_ss?: string;
+  wj_math_facts_flu_pr?: string;
+  wj_sent_write_flu_ss?: string;
+  wj_sent_write_flu_pr?: string;
+  
+  // Extended Battery Subtests
+  wj_read_recall_ss?: string;
+  wj_read_recall_pr?: string;
+  wj_num_matrices_ss?: string;
+  wj_num_matrices_pr?: string;
+  wj_editing_ss?: string;
+  wj_editing_pr?: string;
+  wj_word_read_flu_ss?: string;
+  wj_word_read_flu_pr?: string;
+  wj_spell_sounds_ss?: string;
+  wj_spell_sounds_pr?: string;
+  wj_read_vocab_ss?: string;
+  wj_read_vocab_pr?: string;
+  wj_science_ss?: string;
+  wj_science_pr?: string;
+  wj_social_studies_ss?: string;
+  wj_social_studies_pr?: string;
+  wj_humanities_ss?: string;
+  wj_humanities_pr?: string;
+  
+  // Extended battery toggle
+  includeExtendedBattery?: boolean;
+  
+  // Narrative sections
   narrativeInterpretation?: string;
   summaryOfFindings?: string;
   recommendations?: string;
-  includeExtendedBattery?: boolean; // Specific for some templates
-  // Index signature for all other dynamic placeholder keys
-  [key: string]: any; 
+  
+  // Index signature for dynamic fields
+  [key: string]: any;
 }
 
 interface TemplateCategory {
@@ -96,6 +142,7 @@ const CreateReportPage: React.FC = () => {
   const [currentSubStep, setCurrentSubStep] = useState<number>(1);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<FormData>({});
   const [generatedReport, setGeneratedReport] = useState<string>('');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -107,9 +154,9 @@ const CreateReportPage: React.FC = () => {
     Brain: Brain,
     MessageCircle: MessageCircle,
   };
-  const FileTextIcon = FileText; // Default fallback icon
+  const FileTextIcon = FileText;
   
-  // Mock data for template categories and sub-templates
+  // Template categories data
   const [templateCategories] = useState<TemplateCategory[]>([
     {
       id: '1',
@@ -140,33 +187,42 @@ const CreateReportPage: React.FC = () => {
     }
   ]);
 
-  // WJIV Standard Battery configuration
+  // WJIV Subtest configurations
   const standardSubtestsConfig = [
-    { id: 'letter_word', name: '1. Letter-Word Identification' }, { id: 'applied_problems', name: '2. Applied Problems' },
-    { id: 'spelling', name: '3. Spelling' }, { id: 'passage_comp', name: '4. Passage Comprehension' },
-    { id: 'calculation', name: '5. Calculation' }, { id: 'writing_samples', name: '6. Writing Samples' },
-    { id: 'word_attack', name: '7. Word Attack' }, { id: 'oral_reading', name: '8. Oral Reading' },
-    { id: 'sent_read_flu', name: '9. Sentence Reading Fluency' }, { id: 'math_facts_flu', name: '10. Math Facts Fluency' },
+    { id: 'letter_word', name: '1. Letter-Word Identification' },
+    { id: 'applied_problems', name: '2. Applied Problems' },
+    { id: 'spelling', name: '3. Spelling' },
+    { id: 'passage_comp', name: '4. Passage Comprehension' },
+    { id: 'calculation', name: '5. Calculation' },
+    { id: 'writing_samples', name: '6. Writing Samples' },
+    { id: 'word_attack', name: '7. Word Attack' },
+    { id: 'oral_reading', name: '8. Oral Reading' },
+    { id: 'sent_read_flu', name: '9. Sentence Reading Fluency' },
+    { id: 'math_facts_flu', name: '10. Math Facts Fluency' },
     { id: 'sent_write_flu', name: '11. Sentence Writing Fluency' }
   ];
-  // WJIV Extended Battery configuration
+
   const extendedSubtestsConfig = [
-    { id: 'read_recall', name: '12. Reading Recall' }, { id: 'num_matrices', name: '13. Number Matrices' },
-    { id: 'editing', name: '14. Editing' }, { id: 'word_read_flu', name: '15. Word Reading Fluency' },
-    { id: 'spell_sounds', name: '16. Spelling of Sounds' }, { id: 'read_vocab', name: '17. Reading Vocabulary' },
-    { id: 'science', name: '18. Science' }, { id: 'social_studies', name: '19. Social Studies' },
+    { id: 'read_recall', name: '12. Reading Recall' },
+    { id: 'num_matrices', name: '13. Number Matrices' },
+    { id: 'editing', name: '14. Editing' },
+    { id: 'word_read_flu', name: '15. Word Reading Fluency' },
+    { id: 'spell_sounds', name: '16. Spelling of Sounds' },
+    { id: 'read_vocab', name: '17. Reading Vocabulary' },
+    { id: 'science', name: '18. Science' },
+    { id: 'social_studies', name: '19. Social Studies' },
     { id: 'humanities', name: '20. Humanities' }
   ];
 
-  // Define the structure for WJIV sub-steps (used for titles and field grouping)
   const wjivSubStepsConfig = [
     { title: "Student Information", fields: ['studentName', 'dob', 'doe', 'grade', 'examiner'] },
     { title: "Background & Referral", fields: ['reasonForReferral', 'backgroundInfo', 'assessmentInstruments', 'behavioralObservations'] },
     { title: "WJIV Clusters", fields: ['wj_broad_ss', 'wj_broad_pr', 'wj_broad_range', 'wj_reading_ss', 'wj_reading_pr', 'wj_reading_range', 'wj_written_ss', 'wj_written_pr', 'wj_written_range', 'wj_math_ss', 'wj_math_pr', 'wj_math_range'] },
-    { title: "WJIV Standard & Extended Subtests", fields: [ /* This sub-step will render standardSubtestsConfig and conditionally extendedSubtestsConfig */ ] },
+    { title: "WJIV Standard & Extended Subtests", fields: [] },
     { title: "Narratives & Recommendations", fields: ['narrativeInterpretation', 'summaryOfFindings', 'recommendations'] }
   ];
 
+  // Sub-templates data with comprehensive academic achievement template
   const [subTemplates] = useState<SubTemplate[]>([
     {
       id: '1',
@@ -196,6 +252,40 @@ Examiner: [EXAMINER]
 [BEHAVIORAL_OBSERVATIONS]
 
 ## Test Results & Interpretation
+### Woodcock-Johnson IV Tests of Achievement
+**Clusters:**
+- Broad Achievement: SS [WJ_BROAD_SS], PR [WJ_BROAD_PR], Range [WJ_BROAD_RANGE]
+- Reading: SS [WJ_READING_SS], PR [WJ_READING_PR], Range [WJ_READING_RANGE]
+- Written Language: SS [WJ_WRITTEN_SS], PR [WJ_WRITTEN_PR], Range [WJ_WRITTEN_RANGE]
+- Mathematics: SS [WJ_MATH_SS], PR [WJ_MATH_PR], Range [WJ_MATH_RANGE]
+
+**Standard Battery Subtests:**
+- Letter-Word Identification: SS [WJ_LETTER_WORD_SS], PR [WJ_LETTER_WORD_PR]
+- Applied Problems: SS [WJ_APPLIED_PROBLEMS_SS], PR [WJ_APPLIED_PROBLEMS_PR]
+- Spelling: SS [WJ_SPELLING_SS], PR [WJ_SPELLING_PR]
+- Passage Comprehension: SS [WJ_PASSAGE_COMP_SS], PR [WJ_PASSAGE_COMP_PR]
+- Calculation: SS [WJ_CALCULATION_SS], PR [WJ_CALCULATION_PR]
+- Writing Samples: SS [WJ_WRITING_SAMPLES_SS], PR [WJ_WRITING_SAMPLES_PR]
+- Word Attack: SS [WJ_WORD_ATTACK_SS], PR [WJ_WORD_ATTACK_PR]
+- Oral Reading: SS [WJ_ORAL_READING_SS], PR [WJ_ORAL_READING_PR]
+- Sentence Reading Fluency: SS [WJ_SENT_READ_FLU_SS], PR [WJ_SENT_READ_FLU_PR]
+- Math Facts Fluency: SS [WJ_MATH_FACTS_FLU_SS], PR [WJ_MATH_FACTS_FLU_PR]
+- Sentence Writing Fluency: SS [WJ_SENT_WRITE_FLU_SS], PR [WJ_SENT_WRITE_FLU_PR]
+
+[IF_INCLUDE_EXTENDED_BATTERY_START]
+**Extended Battery Subtests:**
+- Reading Recall: SS [WJ_READ_RECALL_SS], PR [WJ_READ_RECALL_PR]
+- Number Matrices: SS [WJ_NUM_MATRICES_SS], PR [WJ_NUM_MATRICES_PR]
+- Editing: SS [WJ_EDITING_SS], PR [WJ_EDITING_PR]
+- Word Reading Fluency: SS [WJ_WORD_READ_FLU_SS], PR [WJ_WORD_READ_FLU_PR]
+- Spelling of Sounds: SS [WJ_SPELL_SOUNDS_SS], PR [WJ_SPELL_SOUNDS_PR]
+- Reading Vocabulary: SS [WJ_READ_VOCAB_SS], PR [WJ_READ_VOCAB_PR]
+- Science: SS [WJ_SCIENCE_SS], PR [WJ_SCIENCE_PR]
+- Social Studies: SS [WJ_SOCIAL_STUDIES_SS], PR [WJ_SOCIAL_STUDIES_PR]
+- Humanities: SS [WJ_HUMANITIES_SS], PR [WJ_HUMANITIES_PR]
+[IF_INCLUDE_EXTENDED_BATTERY_END]
+
+## Narrative Interpretation of Academic Scores
 [NARRATIVE_INTERPRETATION]
 
 ## Summary of Findings
@@ -258,6 +348,27 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   const isCustomTemplateFlow = routeState?.customTemplateContent;
   const currentAction = searchParams.get('action');
 
+  // Dropzone configuration for file upload
+  const onDrop = React.useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles && acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setSelectedFile(file);
+      setCurrentStep(2);
+      setCurrentSubStep(1);
+      console.log('Dropped file:', file);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive, isDragAccept, isDragReject } = useDropzone({
+    onDrop,
+    accept: {
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt']
+    },
+    multiple: false
+  });
+
   // Initialize from URL params or route state
   useEffect(() => {
     if (isLoadingTemplates) return;
@@ -265,12 +376,10 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     const templateParam = searchParams.get('template');
     
     if (isCustomTemplateFlow) {
-      // Custom template flow
       setCurrentStep(2);
       setSelectedTemplateId('custom');
       setSelectedCategoryId('custom');
       
-      // Initialize form data for custom template
       const customPlaceholders = routeState?.customTemplatePlaceholders || [];
       const initialCustomFormData: FormData = {
         studentName: '',
@@ -297,29 +406,41 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
       
       setFormData(initialCustomFormData);
     } else if (templateParam && templateCategories.length > 0) {
-      // Predefined template flow
-      for (const category of templateCategories) { // category is TemplateCategory here
-        const subTemplate = subTemplates.find(st => // st is SubTemplate here
+      for (const category of templateCategories) {
+        const subTemplate = subTemplates.find(st => 
           st.category_table_id === category.id && st.sub_template_id === templateParam
         );
         
         if (subTemplate) {
           setSelectedTemplateId(subTemplate.sub_template_id);
-          setSelectedCategoryId(category.category_id); // Use category_id (string)
+          setSelectedCategoryId(category.category_id);
           setCurrentStep(2);
           
-          const newInitialFormData: FormData = { /* ... your existing default fields ... */ };
+          const newInitialFormData: FormData = {
+            studentName: '',
+            dob: '',
+            doe: '',
+            grade: '',
+            examiner: '',
+            reasonForReferral: '',
+            backgroundInfo: '',
+            assessmentInstruments: 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)',
+            behavioralObservations: '',
+            includeExtendedBattery: false,
+            narrativeInterpretation: '',
+            summaryOfFindings: '',
+            recommendations: ''
+          };
+
           if (subTemplate.placeholder_keys) {
-            subTemplate.placeholder_keys.forEach((key: string) => { // Add type for key
+            subTemplate.placeholder_keys.forEach((key: string) => {
               const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, (g: string) => g[1].toUpperCase());
               if (!(camelKey in newInitialFormData) || newInitialFormData[camelKey] === undefined) {
                 newInitialFormData[camelKey] = '';
               }
             });
           }
-          if (subTemplate.sub_template_id === 'academic-wjiv' && !newInitialFormData.assessmentInstruments) {
-              newInitialFormData.assessmentInstruments = 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\\n';
-          }
+
           setFormData(prevFormData => ({ ...newInitialFormData, ...prevFormData }));
           break;
         }
@@ -327,6 +448,129 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     }
   }, [searchParams, routeState, templateCategories, isLoadingTemplates, isCustomTemplateFlow]);
 
+  // Utility functions for template processing
+  const toUpperSnakeCase = (camelCase: string): string => {
+    return camelCase.replace(/([A-Z])/g, "_$1").toUpperCase();
+  };
+
+  const populateTemplate = (templateContent: string, data: FormData): string => {
+    let populatedContent = templateContent;
+
+    // Handle conditional extended battery block
+    const extendedStartTag = "[IF_INCLUDE_EXTENDED_BATTERY_START]";
+    const extendedEndTag = "[IF_INCLUDE_EXTENDED_BATTERY_END]";
+    const startIndex = populatedContent.indexOf(extendedStartTag);
+    const endIndex = populatedContent.indexOf(extendedEndTag);
+
+    if (startIndex !== -1 && endIndex !== -1) {
+      if (data.includeExtendedBattery) {
+        populatedContent = populatedContent.replace(extendedStartTag, "").replace(extendedEndTag, "");
+      } else {
+        populatedContent = populatedContent.substring(0, startIndex) + populatedContent.substring(endIndex + extendedEndTag.length);
+      }
+    }
+    
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key) && key !== 'includeExtendedBattery') {
+        const placeholderKey = toUpperSnakeCase(key);
+        const placeholder = `[${placeholderKey}]`;
+        const value = String(data[key as keyof FormData] ?? '');
+        
+        const regex = new RegExp(`\\[${placeholderKey}\\]`, 'g');
+        populatedContent = populatedContent.replace(regex, value || '[N/A]');
+      }
+    }
+
+    // Replace any remaining unfilled placeholders with [N/A]
+    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]');
+    return populatedContent;
+  };
+
+  // DOCX generation functionality
+  const createDocxDocument = (data: FormData, templateId: string, fullTemplateContent: string): Document => {
+    const populatedContent = populateTemplate(fullTemplateContent, data);
+    const lines = populatedContent.split('\n');
+    const paragraphs: Paragraph[] = [];
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      if (!trimmedLine) {
+        paragraphs.push(new Paragraph({ text: '' }));
+        continue;
+      }
+      
+      if (trimmedLine.startsWith('# ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(2),
+          heading: HeadingLevel.HEADING_1,
+        }));
+      } else if (trimmedLine.startsWith('## ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(3),
+          heading: HeadingLevel.HEADING_2,
+        }));
+      } else if (trimmedLine.startsWith('### ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(4),
+          heading: HeadingLevel.HEADING_3,
+        }));
+      } else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+        paragraphs.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: trimmedLine.substring(2, trimmedLine.length - 2),
+              bold: true,
+            }),
+          ],
+        }));
+      } else if (trimmedLine.startsWith('- ')) {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine.substring(2),
+          bullet: {
+            level: 0,
+          },
+        }));
+      } else {
+        paragraphs.push(new Paragraph({
+          text: trimmedLine,
+        }));
+      }
+    }
+    
+    return new Document({
+      sections: [{
+        properties: {},
+        children: paragraphs,
+      }],
+    });
+  };
+
+  const downloadDocxFile = async (filename: string, data: FormData, templateId: string) => {
+    try {
+      const currentTemplateObject = subTemplates.find(t => t.sub_template_id === templateId);
+      if (!currentTemplateObject) {
+        alert("Error: Could not find template to generate download.");
+        return;
+      }
+      
+      console.log('Creating DOCX document...');
+      const doc = createDocxDocument(data, templateId, currentTemplateObject.content);
+      
+      console.log('Converting to blob...');
+      const blob = await Packer.toBlob(doc);
+      
+      console.log('Saving file...');
+      saveAs(blob, filename);
+      
+      console.log('DOCX file download initiated successfully');
+    } catch (error) {
+      console.error('Error generating DOCX file:', error);
+      alert('Error generating DOCX file. Please try again.');
+    }
+  };
+
+  // Event handlers
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     setSelectedTemplateId('');
@@ -355,6 +599,12 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     }));
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    setFormData(prev => ({ ...prev, [name]: val }));
+  };
+
   const generateReport = () => {
     let template = '';
     
@@ -370,20 +620,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
       }
     }
     
-    // Replace placeholders with form data
-    let report = template;
-    Object.entries(formData).forEach(([key, value]) => {
-      // Convert camelCase back to UPPER_SNAKE_CASE for placeholder replacement
-      const placeholderKey = key.replace(/([A-Z])/g, '_$1').toUpperCase();
-      const placeholder = `[${placeholderKey}]`;
-      
-      if (typeof value === 'string') {
-        report = report.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
-      } else if (typeof value === 'boolean') {
-        report = report.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value ? 'Yes' : 'No');
-      }
-    });
-    
+    const report = populateTemplate(template, formData);
     setGeneratedReport(report);
     setCurrentStep(3);
   };
@@ -428,23 +665,11 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     return subTemplates.filter(st => st.category_table_id === category.id);
   };
 
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionId)) {
-        newSet.delete(sectionId);
-      } else {
-        newSet.add(sectionId);
-      }
-      return newSet;
-    });
-  };
-
   const renderFormField = (
     key: string, 
     label: string, 
     type: 'text' | 'textarea' | 'checkbox' | 'date' | 'number' = 'text',
-    placeholder?: string // Add placeholder as optional
+    placeholder?: string
   ) => {
     const value = formData[key] || '';
     
@@ -454,8 +679,9 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
           <input
             type="checkbox"
             id={key}
+            name={key}
             checked={!!value}
-            onChange={(e) => handleFormChange(key, e.target.checked)}
+            onChange={handleInputChange}
             className="rounded border-border focus:ring-2 focus:ring-gold"
           />
           <label htmlFor={key} className="text-sm font-medium">
@@ -473,19 +699,21 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
         {type === 'textarea' ? (
           <textarea
             id={key}
+            name={key}
             value={value}
-            onChange={(e) => handleFormChange(key, e.target.value)}
-            className="w-full p-3 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold min-h-[100px]"
-            placeholder={`Enter ${label.toLowerCase()}`}
+            onChange={handleInputChange}
+            className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold min-h-[100px]"
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
           />
         ) : (
           <input
-            type="text"
+            type={type}
             id={key}
+            name={key}
             value={value}
-            onChange={(e) => handleFormChange(key, e.target.value)}
-            className="w-full p-3 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold"
-            placeholder={`Enter ${label.toLowerCase()}`}
+            onChange={handleInputChange}
+            className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
           />
         )}
       </div>
@@ -524,16 +752,64 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 </button>
                 <h2 className="text-xl font-medium">Upload Custom Template</h2>
               </div>
-              <div className="text-center py-12">
-                <FileText className="text-gold mx-auto mb-4" size={64} />
-                <h3 className="text-xl font-medium mb-4">Upload Your Template File</h3>
-                <p className="text-text-secondary mb-8 max-w-md mx-auto">
-                  Upload a .docx file to create a custom template with placeholders
-                </p>
-                <div className="border-2 border-dashed border-border rounded-lg p-8 hover:border-gold transition-colors">
-                  <p className="text-text-secondary">Drag & drop your .docx file here or click to browse</p>
-                </div>
+              
+              <div 
+                {...getRootProps()} 
+                className={`p-10 border-2 border-dashed rounded-md text-center transition-all cursor-pointer bg-bg-secondary hover:bg-opacity-30 
+                  ${isDragActive ? 'border-gold ring-2 ring-gold' : 'border-border hover:border-gold'}
+                  ${isDragAccept ? 'border-green bg-green bg-opacity-5' : ''}
+                  ${isDragReject ? 'border-red-500 bg-red-500 bg-opacity-5' : ''}`}
+              >
+                <input {...getInputProps()} />
+                <UploadCloud 
+                  size={48} 
+                  className={`mx-auto mb-4 ${
+                    isDragAccept ? 'text-green' :
+                    isDragReject ? 'text-red-500' :
+                    isDragActive ? 'text-gold' : 'text-text-secondary'
+                  }`} 
+                />
+                {isDragReject ? (
+                  <p className="font-medium text-red-500 mb-1">File type not accepted</p>
+                ) : isDragAccept ? (
+                  <p className="font-medium text-green mb-1">Drop to upload template</p>
+                ) : isDragActive ? (
+                  <p className="font-medium text-gold mb-1">Drop the file here</p>
+                ) : (
+                  <p className="font-medium text-text-primary mb-1">Drag & drop your template file here</p>
+                )}
+                <p className="text-sm text-text-secondary mb-4">(.docx, .pdf, or .txt files)</p>
+                <button type="button" className="mt-4 btn btn-primary">
+                  Or Click to Browse
+                </button>
               </div>
+              
+              {selectedFile && (
+                <div className="mt-4 p-3 bg-bg-primary border border-border rounded-md">
+                  <p className="text-sm font-medium text-text-primary">Selected file: {selectedFile.name}</p>
+                  <p className="text-xs text-text-secondary">Type: {selectedFile.type || 'application/octet-stream'}, Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                  <div className="mt-4 text-right">
+                    <button 
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setCurrentSubStep(1);
+                      }} 
+                      className="btn border border-border hover:bg-bg-secondary mr-2"
+                    >
+                      Clear Selection
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setCurrentStep(2);
+                        setCurrentSubStep(1);
+                      }} 
+                      className="btn bg-accent-gold text-black"
+                    >
+                      Use this File & Continue
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : selectedCategoryId && !selectedTemplateId ? (
             // Sub-Template Selection UI
@@ -623,43 +899,19 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   }
 
   // Step 2: Form Input
-  if (currentStep === 2 && (selectedTemplateId || isCustomTemplateFlow)) {
-    // Determine current template name and placeholder keys for dynamic forms
-    let currentFormTitle = "Report Details";
-    let currentPlaceholdersForDynamicForm: string[] = [];
-    let currentSubTemplateObject: SubTemplate | null = null;
-
-    if (isCustomTemplateFlow && routeState?.customTemplatePlaceholders) {
-        currentFormTitle = routeState.customTemplateName || "Custom Report";
-        currentPlaceholdersForDynamicForm = routeState.customTemplatePlaceholders;
-    } else if (selectedTemplateId && templateCategories && subTemplates) { // Use the state variable names
-        // Find the selected sub-template directly from the subTemplatesData array
-        const foundSubTemplate = subTemplates.find((st: SubTemplate) => st.sub_template_id === selectedTemplateId);
-        
-        if (foundSubTemplate) {
-            currentSubTemplateObject = foundSubTemplate; // Assign if found
-            currentFormTitle = foundSubTemplate.name;
-            currentPlaceholdersForDynamicForm = foundSubTemplate.placeholder_keys || [];
-        } else {
-            // Handle case where selectedTemplateId might not match any subTemplate
-            console.warn(`SubTemplate with id "${selectedTemplateId}" not found in mock data.`);
-            // Optionally, redirect or show an error, or clear selectedTemplateId
-            // For now, currentFormTitle will remain "Report Details" and placeholders empty
-        }
-    }
-
+  if (currentStep === 2 && (selectedTemplateId || isCustomTemplateFlow || selectedFile)) {
     // Specific Multi-Sub-Step UI for 'academic-wjiv'
     if (selectedTemplateId === 'academic-wjiv') {
       return (
-        <div className="animate-fadeIn">
+        <div className="animate-fade-in">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => { // Go back to Step 1, clear category/template selections
+              onClick={() => {
                 setCurrentStep(1);
                 setSelectedCategoryId(null);
                 setSelectedTemplateId(null);
-                setSearchParams({}); // Clear URL params
-                setCurrentSubStep(1); // Reset sub-step for next time
+                setSearchParams({});
+                setCurrentSubStep(1);
               }}
               className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
             >
@@ -667,36 +919,38 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               Back to Templates
             </button>
             <h1 className="text-2xl font-medium">
-              {currentFormTitle} (Part {currentSubStep} of {wjivSubStepsConfig.length})
+              WJ-IV Academic Achievement Report (Part {currentSubStep} of {wjivSubStepsConfig.length})
             </h1>
           </div>
 
           <div className="card max-w-4xl mx-auto">
             {/* WJIV Sub-step specific content */}
-            {currentSubStep === 1 && ( /* Student Info */
+            {currentSubStep === 1 && (
               <div className="p-4 animate-fadeIn">
                 <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[0].title}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {renderFormField('studentName', 'Student Name', 'text', "Enter student's full name")}
+                  {renderFormField('studentName', 'Student Name', 'text')}
                   {renderFormField('dob', 'Date of Birth', 'date')}
                   {renderFormField('doe', 'Date of Evaluation', 'date')}
-                  {renderFormField('grade', 'Grade Level', 'text', "e.g., 3rd Grade")}
-                  {renderFormField('examiner', 'Examiner', 'text', "Enter examiner's name and credentials")}
+                  {renderFormField('grade', 'Grade Level', 'text')}
+                  {renderFormField('examiner', 'Examiner', 'text')}
                 </div>
               </div>
             )}
-            {currentSubStep === 2 && ( /* Background & Referral */
+
+            {currentSubStep === 2 && (
               <div className="p-4 animate-fadeIn">
                 <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[1].title}</h3>
                 <div className="space-y-4">
-                  {renderFormField('reasonForReferral', 'Reason for Referral', 'textarea', "Describe why the student was referred...")}
-                  {renderFormField('backgroundInfo', 'Background Information', 'textarea', "Include relevant educational history...")}
-                  {renderFormField('assessmentInstruments', 'Assessment Instruments Administered', 'textarea', formData.assessmentInstruments || 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\n')}
-                  {renderFormField('behavioralObservations', 'Behavioral Observations', 'textarea', "Describe student's behavior during assessment...")}
+                  {renderFormField('reasonForReferral', 'Reason for Referral', 'textarea')}
+                  {renderFormField('backgroundInfo', 'Background Information', 'textarea')}
+                  {renderFormField('assessmentInstruments', 'Assessment Instruments Administered', 'textarea')}
+                  {renderFormField('behavioralObservations', 'Behavioral Observations', 'textarea')}
                 </div>
               </div>
             )}
-            {currentSubStep === 3 && ( /* WJIV Clusters */
+
+            {currentSubStep === 3 && (
               <div className="p-4 animate-fadeIn">
                 <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[2].title}</h3>
                 <div className="space-y-4">
@@ -713,7 +967,8 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 </div>
               </div>
             )}
-            {currentSubStep === 4 && ( /* Standard & Extended Subtests */
+
+            {currentSubStep === 4 && (
               <div className="p-4 animate-fadeIn">
                 <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[3].title}</h3>
                 <h4 className="text-md font-medium my-2 text-text-primary">Standard Battery</h4>
@@ -728,9 +983,11 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                     </div>
                   ))}
                 </div>
+                
                 <div className="mt-4 mb-4">
                   {renderFormField('includeExtendedBattery', 'Include Extended Battery Subtests?', 'checkbox')}
                 </div>
+                
                 {formData.includeExtendedBattery && (
                   <>
                     <h4 className="text-md font-medium my-2 mt-4 text-text-primary">Extended Battery</h4>
@@ -749,7 +1006,8 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 )}
               </div>
             )}
-            {currentSubStep === 5 && ( /* Narratives */
+
+            {currentSubStep === 5 && (
               <div className="p-4 animate-fadeIn">
                 <h3 className="text-lg font-semibold mb-4 text-gold">{wjivSubStepsConfig[4].title}</h3>
                 <div className="space-y-4">
@@ -766,11 +1024,10 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 onClick={() => {
                   if (currentSubStep === 1) { 
                     setCurrentStep(1); 
-                    setSelectedCategoryId(null); // Go back to category selection
+                    setSelectedCategoryId(null);
                     setSelectedTemplateId(null);
-                    setSearchParams({}); // Clear URL params
+                    setSearchParams({});
                   } else {
-                    // Smart back for skipping extended battery if it wasn't shown
                     if (currentSubStep === 5 && !formData.includeExtendedBattery) {
                       setCurrentSubStep(3);
                     } else {
@@ -785,11 +1042,11 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               <button 
                 onClick={() => {
                   if (currentSubStep === 3 && !formData.includeExtendedBattery) {
-                    setCurrentSubStep(5); // Skip to narrative
+                    setCurrentSubStep(5);
                   } else if (currentSubStep < wjivSubStepsConfig.length) { 
                     setCurrentSubStep(prev => prev + 1);
-                  } else { // Last sub-step 
-                    generateReport(); // This will set currentStep = 3
+                  } else {
+                    generateReport();
                   }
                 }}
                 className="btn bg-accent-gold text-black flex items-center gap-1"
@@ -800,13 +1057,37 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
           </div>
         </div>
       );
-    } else { 
-      // Fallback for OTHER predefined templates OR custom templates (uses dynamic flat form)
+    } else {
+      // Fallback for OTHER templates or custom templates or file uploads
+      let currentFormTitle = "Report Details";
+      let currentPlaceholders: string[] = [];
+      
+      if (selectedFile) {
+        currentFormTitle = `Uploaded File: ${selectedFile.name}`;
+        // Placeholder for file parsing - in real implementation, you'd parse the file here
+        currentPlaceholders = ['STUDENT_NAME', 'DOB', 'DOE', 'GRADE', 'EXAMINER'];
+      } else if (isCustomTemplateFlow && routeState?.customTemplatePlaceholders) {
+        currentFormTitle = routeState.customTemplateName || "Custom Report";
+        currentPlaceholders = routeState.customTemplatePlaceholders;
+      } else if (selectedTemplateId) {
+        const foundSubTemplate = subTemplates.find((st: SubTemplate) => st.sub_template_id === selectedTemplateId);
+        if (foundSubTemplate) {
+          currentFormTitle = foundSubTemplate.name;
+          currentPlaceholders = foundSubTemplate.placeholder_keys || [];
+        }
+      }
+
       return (
         <div className="animate-fadeIn">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSearchParams({});}}
+              onClick={() => {
+                setCurrentStep(1); 
+                setSelectedTemplateId(null); 
+                setSelectedCategoryId(null); 
+                setSelectedFile(null);
+                setSearchParams({});
+              }}
               className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
             >
               <ArrowLeft size={16} />
@@ -814,10 +1095,11 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
             </button>
             <h1 className="text-2xl font-medium">Fill: {currentFormTitle}</h1>
           </div>
+          
           <div className="card max-w-4xl mx-auto">
             <div className="space-y-4">
-              {currentPlaceholdersForDynamicForm.length > 0 ? 
-                currentPlaceholdersForDynamicForm.map(key => {
+              {currentPlaceholders.length > 0 ? 
+                currentPlaceholders.map(key => {
                   const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase());
                   const label = key.replace(/_/g, ' ').toLowerCase();
                   const type = key.includes('DATE') || key.includes('DOB') ? 'date' : 
@@ -828,8 +1110,21 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               }
             </div>
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-border">
-              <button onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSearchParams({});}} className="btn border-border">Back to Templates</button>
-              <button onClick={generateReport} className="btn bg-accent-gold text-black">Generate & Review Report</button>
+              <button 
+                onClick={() => {
+                  setCurrentStep(1); 
+                  setSelectedTemplateId(null); 
+                  setSelectedCategoryId(null);
+                  setSelectedFile(null);
+                  setSearchParams({});
+                }} 
+                className="btn border-border"
+              >
+                Back to Templates
+              </button>
+              <button onClick={generateReport} className="btn bg-accent-gold text-black">
+                Generate & Review Report
+              </button>
             </div>
           </div>
         </div>
@@ -871,9 +1166,20 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button className="btn border border-border hover:bg-bg-secondary flex items-center gap-2">
+              <button 
+                onClick={async () => {
+                  if (selectedTemplateId) {
+                    const studentNameSanitized = (formData.studentName || 'Student').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+                    const filename = `${studentNameSanitized}_${selectedTemplateId}_Report.docx`;
+                    await downloadDocxFile(filename, formData, selectedTemplateId);
+                  } else {
+                    alert("Error: No template selected for download.");
+                  }
+                }}
+                className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"
+              >
                 <Download size={16} />
-                Export
+                Export DOCX
               </button>
               <button
                 onClick={handleSaveReport}
@@ -890,11 +1196,12 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
           <div className="border border-border rounded-lg p-6 bg-bg-primary max-h-[60vh] overflow-y-auto">
             {(() => {
               let contentToUse: string | undefined;
-              let currentPlaceholders: string[] | undefined;
 
-              if (isCustomTemplateFlow && routeState?.customTemplateContent) {
+              if (selectedFile) {
+                // Placeholder for uploaded file template content
+                contentToUse = `# UPLOADED TEMPLATE REPORT\n\n## Student Information\nName: [STUDENT_NAME]\nDate of Birth: [DOB]\n\n## Assessment Results\n[This would be populated from the uploaded template file]`;
+              } else if (isCustomTemplateFlow && routeState?.customTemplateContent) {
                 contentToUse = routeState.customTemplateContent;
-                currentPlaceholders = routeState.customTemplatePlaceholders;
               } else if (selectedTemplateId && templateCategories) {
                 const category = templateCategories.find(c => 
                   subTemplates.some(st => st.category_table_id === c.id && st.sub_template_id === selectedTemplateId)
@@ -903,26 +1210,22 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                   st.category_table_id === category?.id && st.sub_template_id === selectedTemplateId
                 );
                 contentToUse = subTemplate?.content;
-                // For predefined, populateTemplate derives placeholders from formData keys if not explicitly given
               }
 
               if (!contentToUse) {
                 return <p className="text-text-secondary italic">No template content available for preview.</p>;
               }
 
-              const populatedText = populateTemplate(contentToUse, formData, isCustomTemplateFlow ? currentPlaceholders : undefined);
+              const populatedText = populateTemplate(contentToUse, formData);
 
               if (isPreviewMode) {
                 if (isCustomTemplateFlow) {
-                  // Custom templates are already HTML (from Quill)
                   return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: populatedText }} />;
                 } else {
-                  // Predefined templates (Markdown-like)
                   const htmlPreview = markdownToBasicHtml(populatedText);
-                  return <div className="prose prose-sm max-w-none\" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
+                  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
                 }
               } else {
-                // Edit mode - show as textarea
                 return (
                   <textarea
                     value={populatedText}
