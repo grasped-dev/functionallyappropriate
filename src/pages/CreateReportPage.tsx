@@ -10,7 +10,7 @@ import { useReports } from '../context/ReportContext';
 const markdownToBasicHtml = (markdownText: string): string => {
   if (!markdownText) return '';
   return markdownText
-    .split('\n')
+    .split('\\n') // Split by escaped newline characters in template strings
     .map(line => {
       const trimmed = line.trim();
       if (trimmed.startsWith('### ')) return `<h3>${trimmed.substring(4)}</h3>`;
@@ -22,6 +22,51 @@ const markdownToBasicHtml = (markdownText: string): string => {
       return `<p>${boldedLine}</p>`;
     })
     .join('');
+};
+
+// Utility function to populate template with form data
+const populateTemplate = (templateContent: string, data: FormData): string => {
+  let populatedContent = templateContent;
+
+  // Handle conditional extended battery block
+  const extendedStartTag = "[IF_INCLUDE_EXTENDED_BATTERY_START]";
+  const extendedEndTag = "[IF_INCLUDE_EXTENDED_BATTERY_END]";
+  const startIndex = populatedContent.indexOf(extendedStartTag);
+  const endIndex = populatedContent.indexOf(extendedEndTag);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    if (data.includeExtendedBattery) {
+      populatedContent = populatedContent.replace(extendedStartTag, "").replace(extendedEndTag, "");
+    } else {
+      populatedContent = populatedContent.substring(0, startIndex) + populatedContent.substring(endIndex + extendedEndTag.length);
+    }
+  }
+  
+  // Replace placeholders with form data
+  Object.entries(data).forEach(([key, value]) => {
+    if (key !== 'includeExtendedBattery') {
+      const placeholderKey = key.replace(/([A-Z])/g, '_$1').toUpperCase();
+      const placeholder = `[${placeholderKey}]`;
+      
+      let stringValue = '';
+      if (typeof value === 'string') {
+        stringValue = value;
+      } else if (typeof value === 'boolean') {
+        stringValue = value ? 'Yes' : 'No';
+      } else if (typeof value === 'number') {
+        stringValue = value.toString();
+      } else {
+        stringValue = String(value || '');
+      }
+      
+      const regex = new RegExp(`\\[${placeholderKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`, 'g');
+      populatedContent = populatedContent.replace(regex, stringValue || '[N/A]');
+    }
+  });
+
+  // Replace any remaining unfilled placeholders with [N/A]
+  populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]');
+  return populatedContent;
 };
 
 // Updated FormData interface with comprehensive fields
@@ -451,39 +496,6 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   // Utility functions for template processing
   const toUpperSnakeCase = (camelCase: string): string => {
     return camelCase.replace(/([A-Z])/g, "_$1").toUpperCase();
-  };
-
-  const populateTemplate = (templateContent: string, data: FormData): string => {
-    let populatedContent = templateContent;
-
-    // Handle conditional extended battery block
-    const extendedStartTag = "[IF_INCLUDE_EXTENDED_BATTERY_START]";
-    const extendedEndTag = "[IF_INCLUDE_EXTENDED_BATTERY_END]";
-    const startIndex = populatedContent.indexOf(extendedStartTag);
-    const endIndex = populatedContent.indexOf(extendedEndTag);
-
-    if (startIndex !== -1 && endIndex !== -1) {
-      if (data.includeExtendedBattery) {
-        populatedContent = populatedContent.replace(extendedStartTag, "").replace(extendedEndTag, "");
-      } else {
-        populatedContent = populatedContent.substring(0, startIndex) + populatedContent.substring(endIndex + extendedEndTag.length);
-      }
-    }
-    
-    for (const key in data) {
-      if (Object.prototype.hasOwnProperty.call(data, key) && key !== 'includeExtendedBattery') {
-        const placeholderKey = toUpperSnakeCase(key);
-        const placeholder = `[${placeholderKey}]`;
-        const value = String(data[key as keyof FormData] ?? '');
-        
-        const regex = new RegExp(`\\[${placeholderKey}\\]`, 'g');
-        populatedContent = populatedContent.replace(regex, value || '[N/A]');
-      }
-    }
-
-    // Replace any remaining unfilled placeholders with [N/A]
-    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]');
-    return populatedContent;
   };
 
   // DOCX generation functionality
@@ -1196,12 +1208,14 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
           <div className="border border-border rounded-lg p-6 bg-bg-primary max-h-[60vh] overflow-y-auto">
             {(() => {
               let contentToUse: string | undefined;
+              let currentPlaceholders: string[] | undefined;
 
               if (selectedFile) {
                 // Placeholder for uploaded file template content
-                contentToUse = `# UPLOADED TEMPLATE REPORT\n\n## Student Information\nName: [STUDENT_NAME]\nDate of Birth: [DOB]\n\n## Assessment Results\n[This would be populated from the uploaded template file]`;
+                contentToUse = `# UPLOADED TEMPLATE REPORT\\n\\n## Student Information\\nName: [STUDENT_NAME]\\nDate of Birth: [DOB]\\n\\n## Assessment Results\\n[This would be populated from the uploaded template file]`;
               } else if (isCustomTemplateFlow && routeState?.customTemplateContent) {
                 contentToUse = routeState.customTemplateContent;
+                currentPlaceholders = routeState.customTemplatePlaceholders;
               } else if (selectedTemplateId && templateCategories) {
                 const category = templateCategories.find(c => 
                   subTemplates.some(st => st.category_table_id === c.id && st.sub_template_id === selectedTemplateId)
@@ -1210,6 +1224,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                   st.category_table_id === category?.id && st.sub_template_id === selectedTemplateId
                 );
                 contentToUse = subTemplate?.content;
+                // For predefined templates, populateTemplate derives placeholders from formData keys
               }
 
               if (!contentToUse) {
@@ -1219,16 +1234,17 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               const populatedText = populateTemplate(contentToUse, formData);
 
               if (isPreviewMode) {
-                if (isCustomTemplateFlow) {
-                  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: populatedText }} />;
+                if (isCustomTemplateFlow) { // Custom templates are already HTML (from Quill)
+                  return <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: populatedText }} />;
                 } else {
+                  // Predefined templates (Markdown-like)
                   const htmlPreview = markdownToBasicHtml(populatedText);
-                  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
+                  return <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
                 }
               } else {
                 return (
                   <textarea
-                    value={populatedText}
+                    value={generatedReport || populatedText}
                     onChange={(e) => setGeneratedReport(e.target.value)}
                     className="w-full h-96 p-4 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold font-mono text-sm resize-none"
                     placeholder="Generated report will appear here..."
