@@ -72,7 +72,7 @@ const GoalWriting: React.FC = () => {
       id: 0,
       title: 'Student Information',
       description: 'Provide general student details, math observations, previous goal progress, and any existing assessment data.',
-      icon: <Target className="text-green\" size={24} />,
+      icon: <Target className="text-green" size={24} />,
     },
     {
       id: 1,
@@ -84,7 +84,7 @@ const GoalWriting: React.FC = () => {
       id: 2,
       title: 'Goal Parameters',
       description: 'Define the specific area and target behavior',
-      icon: <FileText className="text-green\" size={24} />,
+      icon: <FileText className="text-green" size={24} />,
     },
     {
       id: 3,
@@ -567,7 +567,7 @@ const GoalWriting: React.FC = () => {
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-medium">IEP Goal Development Studio</h1>
+        <h1 className="text-3xl font-medium">IEP Development Studio</h1>
       </div>
 
       {/* Hero Section */}
@@ -578,7 +578,7 @@ const GoalWriting: React.FC = () => {
               <Sparkles className="text-green" size={48} />
             </div>
           </div>
-          <h2 className="text-3xl font-medium mb-4">AI-Assisted IEP Goal Development</h2>
+          <h2 className="text-3xl font-medium mb-4">AI-Assisted IEP Development</h2>
           <p className="text-text-secondary text-lg mb-8 max-w-2xl mx-auto">
             Use our AI-powered assistant to guide you through creating comprehensive, measurable Present Levels, Baselines, and IEP Goals for your students.
           </p>
