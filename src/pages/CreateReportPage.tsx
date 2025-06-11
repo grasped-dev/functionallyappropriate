@@ -31,16 +31,12 @@ const CreateReportPage: React.FC = () => {
 
   // Add formatLabel utility function
   const formatLabel = (key: string): string => {
-    if (!key) return '';
-    // First, handle potential camelCase by inserting spaces before capitals
-    const spacedKey = key.replace(/([A-Z])/g, ' $1');
-    // Then, handle snake_case and general formatting
-    return spacedKey
-      .replace(/_/g, ' ') 
-      .trim()
-      .toLowerCase()
-      .replace(/\b\w/g, char => char.toUpperCase()); 
-  };
+  if (!key) return '';
+  return key
+    .replace(/_/g, ' ') // Replace underscores with spaces FIRST
+    .toLowerCase() // Convert to lowercase
+    .replace(/\b\w/g, char => char.toUpperCase()); // Capitalize first letter of each word
+};
 
   // Mock template categories and sub-templates (simulating database data)
   const templateCategoriesData = [
