@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; // Import Quill styles
 
+interface TemplateCategory {
+  id: string;
+  name: string;
+}
+
 interface TemplateEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialContentHtml: string; // Expecting HTML from Mammoth.js
   initialName?: string;
-  onSave: (name: string, contentHtml: string, placeholderKeys: string[]) => void; 
-  // placeholderKeys will be used later
+  onSave: (name: string, contentHtml: string, placeholderKeys: string[], categoryId: string) => void;
+  availableCategories: TemplateCategory[];
 }
 
 // Utility function to convert text to UPPER_SNAKE_CASE
@@ -25,10 +30,12 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
   onClose, 
   initialContentHtml, 
   initialName = '', 
-  onSave 
+  onSave,
+  availableCategories
 }) => {
   const [editorHtml, setEditorHtml] = useState('');
   const [templateName, setTemplateName] = useState('');
+  const [selectedCategoryIdForCustom, setSelectedCategoryIdForCustom] = useState<string>('');
   const [definedPlaceholders, setDefinedPlaceholders] = useState<Array<{ name: string; key: string }>>([]);
   const [isDefinePlaceholderModalOpen, setIsDefinePlaceholderModalOpen] = useState(false);
   const [currentPlaceholderName, setCurrentPlaceholderName] = useState('');
@@ -40,16 +47,26 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
       setTemplateName(initialName);
       setDefinedPlaceholders([]); // Reset placeholders when modal opens
       setCurrentPlaceholderName('');
+      if (availableCategories && availableCategories.length > 0) {
+        setSelectedCategoryIdForCustom(availableCategories[0].id); // Default to first category
+      } else {
+        setSelectedCategoryIdForCustom(''); // Or a 'none' option
+      }
     }
-  }, [isOpen, initialContentHtml, initialName]);
+  }, [isOpen, initialContentHtml, initialName, availableCategories]);
 
   if (!isOpen) {
     return null;
   }
 
   const handleSave = () => {
+    // Ensure a category is selected, or handle default if '' is allowed
+    if (!selectedCategoryIdForCustom && availableCategories.length > 0) { 
+      alert("Please select a category for the template.");
+      return;
+    }
     const placeholderKeys = definedPlaceholders.map(p => p.key);
-    onSave(templateName, editorHtml, placeholderKeys); 
+    onSave(templateName, editorHtml, placeholderKeys, selectedCategoryIdForCustom); 
     onClose();
   };
 
@@ -112,6 +129,25 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div className="bg-bg-primary p-6 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <h2 className="text-2xl font-semibold mb-5 text-text-primary">Create/Edit Custom Template</h2>
+        
+        <div className="mb-4">
+          <label htmlFor="customTemplateCategory" className="block text-sm font-medium mb-1 text-text-secondary">
+            Assign to Category:
+          </label>
+          <select
+            id="customTemplateCategory"
+            value={selectedCategoryIdForCustom}
+            onChange={(e) => setSelectedCategoryIdForCustom(e.target.value)}
+            className="w-full p-2.5 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold text-text-primary"
+          >
+            <option value="" disabled>Select a category</option>
+            {availableCategories.map(cat => (
+              <option key={cat.id} value={cat.id}> 
+                {cat.name}
+              </option>
+            ))}
+          </select>
+        </div>
         
         <div className="mb-4">
           <label htmlFor="customTemplateName" className="block text-sm font-medium mb-1 text-text-secondary">Template Name:</label>
@@ -178,7 +214,7 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
             <button 
               onClick={handleSave} 
               className="btn bg-accent-gold text-black"
-              disabled={!templateName.trim()} // Disable save if no name
+              disabled={!templateName.trim() || (availableCategories.length > 0 && !selectedCategoryIdForCustom)} // Disable save if no name or no category selected
             >
               Save Template
             </button>
