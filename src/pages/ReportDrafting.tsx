@@ -20,6 +20,7 @@ interface AppTemplate {
   content: string; // Can be Markdown for predefined, HTML for custom
   isCustom?: boolean; // Flag to distinguish
   placeholderKeys?: string[]; // For custom templates
+  categoryId?: string; // NEW: To store the category ID for this template
 }
 
 const ReportDrafting: React.FC = () => {
@@ -244,13 +245,15 @@ const ReportDrafting: React.FC = () => {
   };
 
   const handleSaveCustomTemplate = (name: string, contentHtml: string, placeholderKeys: string[], categoryId: string) => {
+    const categoryName = availableCategories.find(c => c.id === categoryId)?.name || 'Unknown';
     const newCustomTemplate: AppTemplate = {
       id: `custom-${Date.now()}-${name.replace(/\s+/g, '_')}`, // More unique ID
       name: name,
-      description: `Custom Template: ${name.substring(0, 50)}...`,
+      description: `Custom Template (Category: ${categoryName})`,
       content: contentHtml, // This is HTML from Quill
       isCustom: true,
       placeholderKeys: placeholderKeys,
+      categoryId: categoryId, // STORE THE CATEGORY ID
     };
     setAllTemplates(prevTemplates => [...prevTemplates, newCustomTemplate]);
     alert(`Template "${name}" saved locally for this session!`);
@@ -413,6 +416,11 @@ const ReportDrafting: React.FC = () => {
                     <h3 className="font-medium text-lg">{template.name}</h3>
                     {template.isCustom && (
                       <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">Custom</span>
+                    )}
+                    {template.isCustom && template.categoryId && (
+                      <span className="px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full">
+                        {availableCategories.find(c => c.id === template.categoryId)?.name || 'Custom'}
+                      </span>
                     )}
                   </div>
                 </div>
