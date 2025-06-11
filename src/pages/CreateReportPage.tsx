@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   UploadCloud, FileText as FileTextIcon, ArrowRight, ArrowLeft, 
-  Download, Save, Eye, EyeOff, CheckCircle, Loader2
+  Download, Save, Eye, EyeOff, CheckCircle, Loader2, Users, BookOpen, 
+  Brain, Target, Calendar, Settings
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
-import { useReports, Report } from '../context/ReportContext'; // Ensure Report is exported
+import { useReports, Report } from '../context/ReportContext';
 
 // --- INTERFACES ---
 interface FormData {
@@ -44,23 +45,97 @@ interface FormData {
   [key: string]: any; 
 }
 
+interface TemplateCategory {
+  id: string;
+  category_id: string;
+  category_name: string;
+  category_description: string;
+  icon_name?: string;
+  sort_order?: number;
+  created_at?: string;
+}
+
+interface SubTemplate {
+  id: string;
+  category_table_id: string;
+  sub_template_id: string;
+  name: string;
+  description?: string;
+  content: string;
+  placeholder_keys?: string[];
+  is_predefined?: boolean;
+  sort_order?: number;
+  created_at?: string;
+}
+
 interface DraftData {
   formData: FormData;
   selectedTemplateId: string | null;
   currentStep: number;
   currentSubStep: number; 
-  selectedFile?: { name: string; type: string; size: number }; // For uploaded template flow if applicable
-  // For custom templates from ReportDrafting.tsx
+  selectedFile?: { name: string; type: string; size: number };
   isCustomFlag?: boolean;
   customTemplateName?: string;
   customTemplateContent?: string;
   customTemplatePlaceholders?: string[];
-  timestamp?: number; // For draft expiry
+  timestamp?: number;
 }
 
-const DRAFT_KEY = 'reportDraft'; // Simplified to one key for now
+const DRAFT_KEY = 'reportDraft';
+const DRAFT_KEY_PREFIX = 'reportDraft_';
 const DRAFT_EXPIRY_HOURS = 24;
 
+// Icon mapping
+const iconMap: { [key: string]: React.ComponentType<any> } = {
+  Users,
+  BookOpen,
+  Brain,
+  Target,
+  Calendar,
+  Settings,
+  FileText: FileTextIcon
+};
+
+// Mock template data
+const templateCategoriesData: TemplateCategory[] = [
+  {
+    id: '1',
+    category_id: 'academic-assessments',
+    category_name: 'Academic Assessments',
+    category_description: 'Comprehensive academic evaluation reports',
+    icon_name: 'BookOpen',
+    sort_order: 1
+  },
+  {
+    id: '2',
+    category_id: 'cognitive-assessments',
+    category_name: 'Cognitive Assessments',
+    category_description: 'Cognitive and intellectual functioning reports',
+    icon_name: 'Brain',
+    sort_order: 2
+  }
+];
+
+const subTemplatesData: SubTemplate[] = [
+  {
+    id: '1',
+    category_table_id: '1',
+    sub_template_id: 'academic-achievement',
+    name: 'Academic Achievement Report (WJIV Focus)',
+    description: 'Comprehensive report using Woodcock-Johnson IV structure.',
+    content: `# ACADEMIC ACHIEVEMENT REPORT\n\n## Student Information\nName: [STUDENT_NAME]\nDate of Birth: [DOB]\nDate of Evaluation: [DOE]\nGrade: [GRADE]\nExaminer: [EXAMINER]\n\n## Reason for Referral\n[REASON_FOR_REFERRAL]\n\n## Background Information\n[BACKGROUND_INFO]\n\n## Assessment Instruments Administered\n[ASSESSMENT_INSTRUMENTS]\n\n## Behavioral Observations\n[BEHAVIORAL_OBSERVATIONS]\n\n## Test Results & Interpretation\n### Woodcock-Johnson IV Tests of Achievement\n**Clusters:**\n- Broad Achievement: SS [WJ_BROAD_SS], PR [WJ_BROAD_PR], Range [WJ_BROAD_RANGE]\n- Reading: SS [WJ_READING_SS], PR [WJ_READING_PR], Range [WJ_READING_RANGE]\n- Written Language: SS [WJ_WRITTEN_SS], PR [WJ_WRITTEN_PR], Range [WJ_WRITTEN_RANGE]\n- Mathematics: SS [WJ_MATH_SS], PR [WJ_MATH_PR], Range [WJ_MATH_RANGE]\n\n**Standard Battery Subtests:**\n- Letter-Word Identification: SS [WJ_LETTER_WORD_SS], PR [WJ_LETTER_WORD_PR]\n- Applied Problems: SS [WJ_APPLIED_PROBLEMS_SS], PR [WJ_APPLIED_PROBLEMS_PR]\n- Spelling: SS [WJ_SPELLING_SS], PR [WJ_SPELLING_PR]\n- Passage Comprehension: SS [WJ_PASSAGE_COMP_SS], PR [WJ_PASSAGE_COMP_PR]\n- Calculation: SS [WJ_CALCULATION_SS], PR [WJ_CALCULATION_PR]\n- Writing Samples: SS [WJ_WRITING_SAMPLES_SS], PR [WJ_WRITING_SAMPLES_PR]\n- Word Attack: SS [WJ_WORD_ATTACK_SS], PR [WJ_WORD_ATTACK_PR]\n- Oral Reading: SS [WJ_ORAL_READING_SS], PR [WJ_ORAL_READING_PR]\n- Sentence Reading Fluency: SS [WJ_SENT_READ_FLU_SS], PR [WJ_SENT_READ_FLU_PR]\n- Math Facts Fluency: SS [WJ_MATH_FACTS_FLU_SS], PR [WJ_MATH_FACTS_FLU_PR]\n- Sentence Writing Fluency: SS [WJ_SENT_WRITE_FLU_SS], PR [WJ_SENT_WRITE_FLU_PR]\n\n[IF_INCLUDE_EXTENDED_BATTERY_START]\n**Extended Battery Subtests:**\n- Reading Recall: SS [WJ_READ_RECALL_SS], PR [WJ_READ_RECALL_PR]\n- Number Matrices: SS [WJ_NUM_MATRICES_SS], PR [WJ_NUM_MATRICES_PR]\n- Editing: SS [WJ_EDITING_SS], PR [WJ_EDITING_PR]\n- Word Reading Fluency: SS [WJ_WORD_READ_FLU_SS], PR [WJ_WORD_READ_FLU_PR]\n- Spelling of Sounds: SS [WJ_SPELL_SOUNDS_SS], PR [WJ_SPELL_SOUNDS_PR]\n- Reading Vocabulary: SS [WJ_READ_VOCAB_SS], PR [WJ_READ_VOCAB_PR]\n- Science: SS [WJ_SCIENCE_SS], PR [WJ_SCIENCE_PR]\n- Social Studies: SS [WJ_SOCIAL_STUDIES_SS], PR [WJ_SOCIAL_STUDIES_PR]\n- Humanities: SS [WJ_HUMANITIES_SS], PR [WJ_HUMANITIES_PR]\n[IF_INCLUDE_EXTENDED_BATTERY_END]\n\n## Narrative Interpretation of Academic Scores\n[NARRATIVE_INTERPRETATION]\n\n## Summary of Findings\n[SUMMARY_OF_FINDINGS]\n\n## Recommendations\n[RECOMMENDATIONS]`,
+    placeholder_keys: ['STUDENT_NAME', 'DOB', 'DOE', 'GRADE', 'EXAMINER', 'REASON_FOR_REFERRAL', 'BACKGROUND_INFO', 'ASSESSMENT_INSTRUMENTS', 'BEHAVIORAL_OBSERVATIONS', 'WJ_BROAD_SS', 'WJ_BROAD_PR', 'WJ_BROAD_RANGE', 'WJ_READING_SS', 'WJ_READING_PR', 'WJ_READING_RANGE', 'WJ_WRITTEN_SS', 'WJ_WRITTEN_PR', 'WJ_WRITTEN_RANGE', 'WJ_MATH_SS', 'WJ_MATH_PR', 'WJ_MATH_RANGE', 'WJ_LETTER_WORD_SS', 'WJ_LETTER_WORD_PR', 'WJ_APPLIED_PROBLEMS_SS', 'WJ_APPLIED_PROBLEMS_PR', 'WJ_SPELLING_SS', 'WJ_SPELLING_PR', 'WJ_PASSAGE_COMP_SS', 'WJ_PASSAGE_COMP_PR', 'WJ_CALCULATION_SS', 'WJ_CALCULATION_PR', 'WJ_WRITING_SAMPLES_SS', 'WJ_WRITING_SAMPLES_PR', 'WJ_WORD_ATTACK_SS', 'WJ_WORD_ATTACK_PR', 'WJ_ORAL_READING_SS', 'WJ_ORAL_READING_PR', 'WJ_SENT_READ_FLU_SS', 'WJ_SENT_READ_FLU_PR', 'WJ_MATH_FACTS_FLU_SS', 'WJ_MATH_FACTS_FLU_PR', 'WJ_SENT_WRITE_FLU_SS', 'WJ_SENT_WRITE_FLU_PR', 'WJ_READ_RECALL_SS', 'WJ_READ_RECALL_PR', 'WJ_NUM_MATRICES_SS', 'WJ_NUM_MATRICES_PR', 'WJ_EDITING_SS', 'WJ_EDITING_PR', 'WJ_WORD_READ_FLU_SS', 'WJ_WORD_READ_FLU_PR', 'WJ_SPELL_SOUNDS_SS', 'WJ_SPELL_SOUNDS_PR', 'WJ_READ_VOCAB_SS', 'WJ_READ_VOCAB_PR', 'WJ_SCIENCE_SS', 'WJ_SCIENCE_PR', 'WJ_SOCIAL_STUDIES_SS', 'WJ_SOCIAL_STUDIES_PR', 'WJ_HUMANITIES_SS', 'WJ_HUMANITIES_PR','NARRATIVE_INTERPRETATION', 'SUMMARY_OF_FINDINGS', 'RECOMMENDATIONS']
+  },
+  {
+    id: '2',
+    category_table_id: '2',
+    sub_template_id: 'cognitive-general',
+    name: 'General Cognitive Profile',
+    description: 'Overview of cognitive functioning.',
+    content: '# COGNITIVE REPORT\nName: [STUDENT_NAME]\nFSIQ: [FSIQ_SCORE]',
+    placeholder_keys: ['STUDENT_NAME', 'DOB', 'FSIQ_SCORE']
+  }
+];
 
 // Helper function to convert basic Markdown-like text to HTML for preview
 const markdownToBasicHtml = (markdownText: string): string => {
@@ -72,7 +147,7 @@ const markdownToBasicHtml = (markdownText: string): string => {
       if (trimmed.startsWith('### ')) return `<h3>${trimmed.substring(4)}</h3>`;
       if (trimmed.startsWith('## ')) return `<h2>${trimmed.substring(3)}</h2>`;
       if (trimmed.startsWith('# ')) return `<h1>${trimmed.substring(2)}</h1>`;
-      if (trimmed.startsWith('- ')) return `<ul><li>${trimmed.substring(2)}</li></ul>`; // Basic list, won't nest correctly
+      if (trimmed.startsWith('- ')) return `<ul><li>${trimmed.substring(2)}</li></ul>`;
       if (trimmed === '') return '<br>';
       const boldedLine = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       return `<p>${boldedLine}</p>`;
@@ -85,16 +160,19 @@ const toUpperSnakeCase = (keyString: string): string => {
   return keyString.replace(/([A-Z0-9]+)/g, "_$1").replace(/([a-z])([A-Z0-9])/g, '$1_$2').replace(/^_/, "").toUpperCase().replace(/_{2,}/g, '_');
 };
 
+const formatLabel = (key: string): string => {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 // Predefined template data (hardcoded in this component for now)
 const fullTemplatesData = [
     {
-      id: 'academic-achievement', // This ID must match what ReportDrafting.tsx Link sends
+      id: 'academic-achievement',
       name: 'Academic Achievement Report (WJIV Focus)',
       description: 'Comprehensive report using Woodcock-Johnson IV structure.',
       content: `# ACADEMIC ACHIEVEMENT REPORT\n\n## Student Information\nName: [STUDENT_NAME]\nDate of Birth: [DOB]\nDate of Evaluation: [DOE]\nGrade: [GRADE]\nExaminer: [EXAMINER]\n\n## Reason for Referral\n[REASON_FOR_REFERRAL]\n\n## Background Information\n[BACKGROUND_INFO]\n\n## Assessment Instruments Administered\n[ASSESSMENT_INSTRUMENTS]\n\n## Behavioral Observations\n[BEHAVIORAL_OBSERVATIONS]\n\n## Test Results & Interpretation\n### Woodcock-Johnson IV Tests of Achievement\n**Clusters:**\n- Broad Achievement: SS [WJ_BROAD_SS], PR [WJ_BROAD_PR], Range [WJ_BROAD_RANGE]\n- Reading: SS [WJ_READING_SS], PR [WJ_READING_PR], Range [WJ_READING_RANGE]\n- Written Language: SS [WJ_WRITTEN_SS], PR [WJ_WRITTEN_PR], Range [WJ_WRITTEN_RANGE]\n- Mathematics: SS [WJ_MATH_SS], PR [WJ_MATH_PR], Range [WJ_MATH_RANGE]\n\n**Standard Battery Subtests:**\n- Letter-Word Identification: SS [WJ_LETTER_WORD_SS], PR [WJ_LETTER_WORD_PR]\n- Applied Problems: SS [WJ_APPLIED_PROBLEMS_SS], PR [WJ_APPLIED_PROBLEMS_PR]\n- Spelling: SS [WJ_SPELLING_SS], PR [WJ_SPELLING_PR]\n- Passage Comprehension: SS [WJ_PASSAGE_COMP_SS], PR [WJ_PASSAGE_COMP_PR]\n- Calculation: SS [WJ_CALCULATION_SS], PR [WJ_CALCULATION_PR]\n- Writing Samples: SS [WJ_WRITING_SAMPLES_SS], PR [WJ_WRITING_SAMPLES_PR]\n- Word Attack: SS [WJ_WORD_ATTACK_SS], PR [WJ_WORD_ATTACK_PR]\n- Oral Reading: SS [WJ_ORAL_READING_SS], PR [WJ_ORAL_READING_PR]\n- Sentence Reading Fluency: SS [WJ_SENT_READ_FLU_SS], PR [WJ_SENT_READ_FLU_PR]\n- Math Facts Fluency: SS [WJ_MATH_FACTS_FLU_SS], PR [WJ_MATH_FACTS_FLU_PR]\n- Sentence Writing Fluency: SS [WJ_SENT_WRITE_FLU_SS], PR [WJ_SENT_WRITE_FLU_PR]\n\n[IF_INCLUDE_EXTENDED_BATTERY_START]\n**Extended Battery Subtests:**\n- Reading Recall: SS [WJ_READ_RECALL_SS], PR [WJ_READ_RECALL_PR]\n- Number Matrices: SS [WJ_NUM_MATRICES_SS], PR [WJ_NUM_MATRICES_PR]\n- Editing: SS [WJ_EDITING_SS], PR [WJ_EDITING_PR]\n- Word Reading Fluency: SS [WJ_WORD_READ_FLU_SS], PR [WJ_WORD_READ_FLU_PR]\n- Spelling of Sounds: SS [WJ_SPELL_SOUNDS_SS], PR [WJ_SPELL_SOUNDS_PR]\n- Reading Vocabulary: SS [WJ_READ_VOCAB_SS], PR [WJ_READ_VOCAB_PR]\n- Science: SS [WJ_SCIENCE_SS], PR [WJ_SCIENCE_PR]\n- Social Studies: SS [WJ_SOCIAL_STUDIES_SS], PR [WJ_SOCIAL_STUDIES_PR]\n- Humanities: SS [WJ_HUMANITIES_SS], PR [WJ_HUMANITIES_PR]\n[IF_INCLUDE_EXTENDED_BATTERY_END]\n\n## Narrative Interpretation of Academic Scores\n[NARRATIVE_INTERPRETATION]\n\n## Summary of Findings\n[SUMMARY_OF_FINDINGS]\n\n## Recommendations\n[RECOMMENDATIONS]`,
       placeholder_keys: ['STUDENT_NAME', 'DOB', 'DOE', 'GRADE', 'EXAMINER', 'REASON_FOR_REFERRAL', 'BACKGROUND_INFO', 'ASSESSMENT_INSTRUMENTS', 'BEHAVIORAL_OBSERVATIONS', 'WJ_BROAD_SS', 'WJ_BROAD_PR', 'WJ_BROAD_RANGE', 'WJ_READING_SS', 'WJ_READING_PR', 'WJ_READING_RANGE', 'WJ_WRITTEN_SS', 'WJ_WRITTEN_PR', 'WJ_WRITTEN_RANGE', 'WJ_MATH_SS', 'WJ_MATH_PR', 'WJ_MATH_RANGE', 'WJ_LETTER_WORD_SS', 'WJ_LETTER_WORD_PR', 'WJ_APPLIED_PROBLEMS_SS', 'WJ_APPLIED_PROBLEMS_PR', 'WJ_SPELLING_SS', 'WJ_SPELLING_PR', 'WJ_PASSAGE_COMP_SS', 'WJ_PASSAGE_COMP_PR', 'WJ_CALCULATION_SS', 'WJ_CALCULATION_PR', 'WJ_WRITING_SAMPLES_SS', 'WJ_WRITING_SAMPLES_PR', 'WJ_WORD_ATTACK_SS', 'WJ_WORD_ATTACK_PR', 'WJ_ORAL_READING_SS', 'WJ_ORAL_READING_PR', 'WJ_SENT_READ_FLU_SS', 'WJ_SENT_READ_FLU_PR', 'WJ_MATH_FACTS_FLU_SS', 'WJ_MATH_FACTS_FLU_PR', 'WJ_SENT_WRITE_FLU_SS', 'WJ_SENT_WRITE_FLU_PR', 'WJ_READ_RECALL_SS', 'WJ_READ_RECALL_PR', 'WJ_NUM_MATRICES_SS', 'WJ_NUM_MATRICES_PR', 'WJ_EDITING_SS', 'WJ_EDITING_PR', 'WJ_WORD_READ_FLU_SS', 'WJ_WORD_READ_FLU_PR', 'WJ_SPELL_SOUNDS_SS', 'WJ_SPELL_SOUNDS_PR', 'WJ_READ_VOCAB_SS', 'WJ_READ_VOCAB_PR', 'WJ_SCIENCE_SS', 'WJ_SCIENCE_PR', 'WJ_SOCIAL_STUDIES_SS', 'WJ_SOCIAL_STUDIES_PR', 'WJ_HUMANITIES_SS', 'WJ_HUMANITIES_PR','NARRATIVE_INTERPRETATION', 'SUMMARY_OF_FINDINGS', 'RECOMMENDATIONS']
     },
-    // Add other predefined templates here with their full content and placeholder_keys
     { id: 'cognitive-general', name: 'General Cognitive Profile', description: 'Overview of cognitive functioning.', content: '# COGNITIVE REPORT\nName: [STUDENT_NAME]\nFSIQ: [FSIQ_SCORE]', placeholder_keys: ['STUDENT_NAME', 'DOB', 'FSIQ_SCORE'] },
 ];
 
@@ -124,27 +202,33 @@ const wjivSubStepsConfig = [
   { title: "Narratives & Recommendations", fields: ['narrativeInterpretation', 'summaryOfFindings', 'recommendations'] }
 ];
 
-
 const CreateReportPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { addReport } = useReports();
   
+  // Missing state variables
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [errorLoadingTemplates, setErrorLoadingTemplates] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [reportName, setReportName] = useState('');
+  const [showPreview, setShowPreview] = useState(true);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [currentSubStep, setCurrentSubStep] = useState<number>(1);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(searchParams.get('template'));
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); // For ?action=upload flow
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<FormData>({});
-  const [generatedReport, setGeneratedReport] = useState<string>(''); // For Step 3 editable preview
-  const [isPreviewMode, setIsPreviewMode] = useState(true); // Default to HTML preview in Step 3
+  const [generatedReport, setGeneratedReport] = useState<string>('');
+  const [isPreviewMode, setIsPreviewMode] = useState(true);
 
   // For custom templates passed via route state from ReportDrafting.tsx
   const routeState = location.state as { 
     customTemplateContent?: string; 
-    customTemplatePlaceholders?: string[]; // UPPER_SNAKE_CASE keys
+    customTemplatePlaceholders?: string[];
     customTemplateName?: string;
-    isCustomFlag?: boolean; // This indicates it's a custom template
+    isCustomFlag?: boolean;
   } | null;
 
   const isEffectivelyCustom = !!routeState?.isCustomFlag && selectedTemplateId?.startsWith('custom-');
@@ -153,13 +237,29 @@ const CreateReportPage: React.FC = () => {
   const activeCustomName = isEffectivelyCustom ? routeState?.customTemplateName : undefined;
   const currentAction = searchParams.get('action');
 
+  // Dropzone setup
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+    },
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        setSelectedFile(acceptedFiles[0]);
+      }
+    }
+  });
 
   // Initialize form data and step based on URL or custom template state
   useEffect(() => {
     const templateParam = searchParams.get('template');
-    setSelectedTemplateId(templateParam); // Sync with URL
+    setSelectedTemplateId(templateParam);
 
-    let initialFData: FormData = { studentName: '', dob: '', doe: '', grade: '', examiner: '', reasonForReferral: '', backgroundInfo: '', assessmentInstruments: '', behavioralObservations: '', includeExtendedBattery: false, narrativeInterpretation: '', summaryOfFindings: '', recommendations: ''};
+    let initialFData: FormData = { 
+      studentName: '', dob: '', doe: '', grade: '', examiner: '', 
+      reasonForReferral: '', backgroundInfo: '', assessmentInstruments: '', 
+      behavioralObservations: '', includeExtendedBattery: false, 
+      narrativeInterpretation: '', summaryOfFindings: '', recommendations: ''
+    };
     let stepToGo = 1;
 
     if (isEffectivelyCustom && routeState?.customTemplatePlaceholders) {
@@ -176,20 +276,20 @@ const CreateReportPage: React.FC = () => {
                 const camelKey = key.toLowerCase().replace(/_([a-z0-9])/g, (g) => g[1].toUpperCase());
                 initialFData[camelKey] = '';
             });
-            if (templateParam === 'academic-achievement') { // Specific to current detailed form
+            if (templateParam === 'academic-achievement') {
                 initialFData.assessmentInstruments = 'Woodcock-Johnson IV Tests of Achievement (WJ IV ACH)\n';
                 initialFData.includeExtendedBattery = false;
             }
-        } else if (!searchParams.get('action')) { // Template in URL not found, not upload action
-            stepToGo = 1; // Go back to selection
-            setSelectedTemplateId(null); // Clear invalid template
+        } else if (!searchParams.get('action')) {
+            stepToGo = 1;
+            setSelectedTemplateId(null);
         }
     } else if (searchParams.get('action') === 'upload') {
-        stepToGo = 1; // Stay on step 1 for upload UI
+        stepToGo = 1;
     }
 
     setCurrentStep(stepToGo);
-    if (stepToGo === 2) setCurrentSubStep(1); // Reset sub-step when entering step 2
+    if (stepToGo === 2) setCurrentSubStep(1);
     
     // Load draft after determining initial setup
     const draftKey = getDraftKey(templateParam, currentAction, isEffectivelyCustom);
@@ -200,45 +300,48 @@ const CreateReportPage: React.FC = () => {
             setFormData(loadedDraft.formData);
             setCurrentStep(loadedDraft.currentStep);
             setCurrentSubStep(loadedDraft.currentSubStep || 1);
-            setSelectedTemplateId(loadedDraft.selectedTemplateId); // This should re-trigger this effect if needed
+            setSelectedTemplateId(loadedDraft.selectedTemplateId);
             if (loadedDraft.selectedTemplateId && loadedDraft.selectedTemplateId !== templateParam){
                  setSearchParams({template: loadedDraft.selectedTemplateId}, {replace: true});
             }
-            if(loadedDraft.isCustomFlag && !routeState){ // If draft is custom but no route state (page refresh)
-                // Need to reconstruct custom template info from draft for rendering
-                // This is where you might set local states like draftedCustomContent etc. if needed.
-                // For now, this means the form will render from formData keys.
+            if(loadedDraft.isCustomFlag && !routeState){
                 console.log("Resumed custom template draft without route state.");
             }
         } else {
             clearDraft(draftKey);
-            if (stepToGo === 2) setFormData(initialFData); // Set fresh form data if draft declined
+            if (stepToGo === 2) setFormData(initialFData);
         }
     } else if (stepToGo === 2) {
-        setFormData(initialFData); // No draft, set initial form data for selected template
+        setFormData(initialFData);
     }
 
-  }, [searchParams, routeState]); // Removed isEffectivelyCustom from deps as it's derived
+  }, [searchParams, routeState]);
 
   // Auto-save draft
   const getDraftKey = useCallback((currentTplId: string | null, currentAct: string | null, isCustom: boolean): string => {
-    if (isCustom && currentTplId) return `${DRAFT_KEY_PREFIX}${currentTplId}`; // custom-TemplateName
-    if (currentTplId) return `${DRAFT_KEY_PREFIX}${currentTplId}`; // predefined-template-id
+    if (isCustom && currentTplId) return `${DRAFT_KEY_PREFIX}${currentTplId}`;
+    if (currentTplId) return `${DRAFT_KEY_PREFIX}${currentTplId}`;
     if (currentAct === 'upload') return `${DRAFT_KEY_PREFIX}action_upload`;
     return `${DRAFT_KEY_PREFIX}general_selection`;
   }, []);
 
   useEffect(() => {
-    if (currentStep === 1 && !selectedTemplateId && !currentAction) return; // Don't save on initial selection screen
+    if (currentStep === 1 && !selectedTemplateId && !currentAction) return;
 
     const draftKey = getDraftKey(selectedTemplateId, currentAction, isEffectivelyCustom);
     const hasMeaningfulData = Object.values(formData).some(val => (typeof val === 'string' && val !== '') || (typeof val === 'boolean' && val));
 
     if (hasMeaningfulData || currentStep > 1 || (currentStep === 1 && currentAction === 'upload' && selectedFile)) {
-      const draftData: DraftData = { formData, selectedTemplateId, currentStep, currentSubStep, selectedFile: selectedFile ? { name: selectedFile.name, type: selectedFile.type, size: selectedFile.size } : undefined };
+      const draftData: DraftData = { 
+        formData, 
+        selectedTemplateId, 
+        currentStep, 
+        currentSubStep, 
+        selectedFile: selectedFile ? { name: selectedFile.name, type: selectedFile.type, size: selectedFile.size } : undefined 
+      };
       if (isEffectivelyCustom) {
         draftData.isCustomFlag = true;
-        draftData.customTemplateName = routeState?.customTemplateName; // Get from routeState for saving
+        draftData.customTemplateName = routeState?.customTemplateName;
         draftData.customTemplateContent = routeState?.customTemplateContent;
         draftData.customTemplatePlaceholders = routeState?.customTemplatePlaceholders;
       }
@@ -246,17 +349,26 @@ const CreateReportPage: React.FC = () => {
     }
   }, [formData, currentStep, currentSubStep, selectedTemplateId, selectedFile, currentAction, isEffectivelyCustom, routeState, getDraftKey]);
 
-  const saveDraft = (key: string, data: DraftData) => { localStorage.setItem(key, JSON.stringify({...data, timestamp: Date.now()})); console.log("Draft saved to", key); };
+  const saveDraft = (key: string, data: DraftData) => { 
+    localStorage.setItem(key, JSON.stringify({...data, timestamp: Date.now()})); 
+    console.log("Draft saved to", key); 
+  };
+  
   const loadDraft = (key: string): DraftData | null => { 
       const d = localStorage.getItem(key); 
       if (!d) return null;
       const draft = JSON.parse(d) as DraftData;
       if(draft.timestamp && (Date.now() - draft.timestamp) / (1000 * 60 * 60) > DRAFT_EXPIRY_HOURS) {
-          localStorage.removeItem(key); return null;
+          localStorage.removeItem(key); 
+          return null;
       }
       return draft; 
   };
-  const clearDraft = (key: string) => { localStorage.removeItem(key); console.log("Draft cleared for", key); };
+  
+  const clearDraft = (key: string) => { 
+    localStorage.removeItem(key); 
+    console.log("Draft cleared for", key); 
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -282,8 +394,6 @@ const CreateReportPage: React.FC = () => {
     const keysForReplacement = placeholderKeysToUse || Object.keys(data);
 
     keysForReplacement.forEach(originalKey => {
-      // If placeholderKeysToUse is provided, originalKey is already UPPER_SNAKE_CASE
-      // Otherwise, formDataKey is camelCase and needs conversion for placeholder matching
       const formDataKey = placeholderKeysToUse ? originalKey.toLowerCase().replace(/_([a-z0-9])/g, g => g[1].toUpperCase()) : originalKey;
       const placeholderTagKey = placeholderKeysToUse ? originalKey : toUpperSnakeCase(originalKey);
       
@@ -293,7 +403,7 @@ const CreateReportPage: React.FC = () => {
         populatedContent = populatedContent.replace(regex, value || '[N/A]');
       }
     });
-    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]'); // Clean up remaining
+    populatedContent = populatedContent.replace(/\[[A-Z0-9_]+\]/g, '[N/A]');
     return populatedContent;
   };
   
@@ -317,12 +427,24 @@ const CreateReportPage: React.FC = () => {
       lines.forEach(line => {
         const trimmedLine = line.trim(); 
         let paragraphChildren: TextRun[] = [];
-        if (trimmedLine.startsWith('## ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(3), heading: HeadingLevel.HEADING_2 })); }
-        else if (trimmedLine.startsWith('# ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), heading: HeadingLevel.HEADING_1 })); }
-        else if (trimmedLine.startsWith('### ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(4), heading: HeadingLevel.HEADING_3 })); }
-        else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.length > 4) { paragraphChildren.push(new TextRun({ text: trimmedLine.substring(2, trimmedLine.length - 2), bold: true }));}
-        else if (trimmedLine.startsWith('- ')) { docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), bullet: { level: 0 } })); }
-        else if (trimmedLine) { paragraphChildren.push(new TextRun(trimmedLine)); }
+        if (trimmedLine.startsWith('## ')) { 
+          docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(3), heading: HeadingLevel.HEADING_2 })); 
+        }
+        else if (trimmedLine.startsWith('# ')) { 
+          docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), heading: HeadingLevel.HEADING_1 })); 
+        }
+        else if (trimmedLine.startsWith('### ')) { 
+          docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(4), heading: HeadingLevel.HEADING_3 })); 
+        }
+        else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.length > 4) { 
+          paragraphChildren.push(new TextRun({ text: trimmedLine.substring(2, trimmedLine.length - 2), bold: true }));
+        }
+        else if (trimmedLine.startsWith('- ')) { 
+          docxParagraphs.push(new Paragraph({ text: trimmedLine.substring(2), bullet: { level: 0 } })); 
+        }
+        else if (trimmedLine) { 
+          paragraphChildren.push(new TextRun(trimmedLine)); 
+        }
         
         if (paragraphChildren.length > 0 && !(trimmedLine.startsWith('## ') || trimmedLine.startsWith('# ') || trimmedLine.startsWith('### ') || trimmedLine.startsWith('- '))) {
             docxParagraphs.push(new Paragraph({ children: paragraphChildren }));
@@ -339,7 +461,7 @@ const CreateReportPage: React.FC = () => {
     let filenameSuffix = 'Report';
     let currentPlaceholdersForDocx = undefined;
 
-    if (isCustomTemplateFlow && activeCustomContent) {
+    if (isEffectivelyCustom && activeCustomContent) {
       contentToUse = activeCustomContent;
       filenameSuffix = activeCustomName || 'Custom_Report';
       currentPlaceholdersForDocx = activeCustomPlaceholders;
@@ -350,14 +472,68 @@ const CreateReportPage: React.FC = () => {
       filenameSuffix = subTemplate?.name || selectedTemplateId;
     }
 
-    if (!contentToUse) { alert("Template content not found for DOCX."); return; }
+    if (!contentToUse) { 
+      alert("Template content not found for DOCX."); 
+      return; 
+    }
     
     const studentNameSanitized = (formData.studentName || 'Student').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
     const filename = `${studentNameSanitized}_${filenameSuffix.replace(/\s+/g, '_')}.docx`;
     
-    const doc = createDocxDocument(formData, contentToUse, !!isCustomTemplateFlow, currentPlaceholdersForDocx);
+    const doc = createDocxDocument(formData, contentToUse, !!isEffectivelyCustom, currentPlaceholdersForDocx);
     const blob = await Packer.toBlob(doc);
     saveAs(blob, filename);
+  };
+
+  // Generate report function
+  const generateReport = () => {
+    let contentToUse: string | undefined;
+    let placeholdersForPopulation = undefined;
+
+    if (isEffectivelyCustom && activeCustomContent) {
+        contentToUse = activeCustomContent;
+        placeholdersForPopulation = activeCustomPlaceholders;
+    } else if (selectedTemplateId) {
+        const template = fullTemplatesData.find(t => t.id === selectedTemplateId);
+        contentToUse = template?.content;
+    }
+
+    if (!contentToUse) {
+      alert("Template content not found.");
+      return;
+    }
+
+    const reportText = populateTemplate(contentToUse, formData, placeholdersForPopulation);
+    const htmlReport = markdownToBasicHtml(reportText);
+    setGeneratedReport(htmlReport);
+    setReportName(`${formData.studentName || 'Student'} - ${activeCustomName || selectedTemplateId || 'Report'}`);
+    setCurrentStep(3);
+  };
+
+  // Save report function
+  const saveReport = () => {
+    if (!formData.studentName || !generatedReport) {
+      alert("Student name and report content are required.");
+      return;
+    }
+
+    const newReport: Report = {
+      id: Date.now(),
+      name: reportName || `${formData.studentName} - Report`,
+      type: activeCustomName || selectedTemplateId || 'Report',
+      date: new Date().toISOString().split('T')[0],
+      status: 'Completed',
+      content: generatedReport,
+      formData: { ...formData }
+    };
+
+    addReport(newReport);
+    
+    // Clear draft
+    const draftKey = getDraftKey(selectedTemplateId, currentAction, isEffectivelyCustom);
+    clearDraft(draftKey);
+    
+    navigate('/reports');
   };
   
   const handleFinalizeReport = () => {
@@ -365,7 +541,7 @@ const CreateReportPage: React.FC = () => {
     let templateNameToSave: string | undefined;
     let placeholdersForPopulation = undefined;
 
-    if (isCustomTemplateFlow && activeCustomContent) {
+    if (isEffectivelyCustom && activeCustomContent) {
         contentToUse = activeCustomContent;
         templateNameToSave = activeCustomName || "Custom Report";
         placeholdersForPopulation = activeCustomPlaceholders;
@@ -377,30 +553,83 @@ const CreateReportPage: React.FC = () => {
     }
 
     if (!contentToUse || !templateNameToSave || !formData.studentName) {
-      alert("Student name and template selection are required."); return;
+      alert("Student name and template selection are required."); 
+      return;
     }
     
     const reportText = populateTemplate(contentToUse, formData, placeholdersForPopulation);
     const newReportToAdd: Report = {
-      id: Date.now(), name: `${formData.studentName} - ${templateNameToSave}`,
-      type: templateNameToSave, date: new Date().toISOString().split('T')[0], status: 'Completed',
-      content: reportText, formData: { ...formData }
+      id: Date.now(), 
+      name: `${formData.studentName} - ${templateNameToSave}`,
+      type: templateNameToSave, 
+      date: new Date().toISOString().split('T')[0], 
+      status: 'Completed',
+      content: reportText, 
+      formData: { ...formData }
     };
     addReport(newReportToAdd);
-    clearDraft(getDraftKey(selectedTemplateId, selectedCategoryId, currentAction));
+    const draftKey = getDraftKey(selectedTemplateId, currentAction, isEffectivelyCustom);
+    clearDraft(draftKey);
     navigate('/reports');
   };
 
   const renderFormField = (key: string, label: string, type: 'text' | 'textarea' | 'checkbox' | 'date' | 'number' = 'text', placeholder?: string) => {
     const value = formData[key] || (type === 'checkbox' ? false : '');
     
-    return ( <div key={key} className="mb-4"> <label htmlFor={key} className="block text-sm font-medium mb-1 text-text-primary capitalize">{label}</label> {type === 'checkbox' ? ( <input type="checkbox" id={key} name={key} checked={!!formData[key]} onChange={handleInputChange} className="h-4 w-4 text-gold border-border rounded focus:ring-gold"/> ) : type === 'textarea' ? ( <textarea name={key} id={key} value={value} onChange={handleInputChange} rows={3} className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold" placeholder={placeholder || `Enter ${label.toLowerCase()}`}/> ) : ( <input type={type} name={key} id={key} value={value} onChange={handleInputChange} className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold" placeholder={placeholder || `Enter ${label.toLowerCase()}`}/> )} </div> );
+    return ( 
+      <div key={key} className="mb-4"> 
+        <label htmlFor={key} className="block text-sm font-medium mb-1 text-text-primary capitalize">{label}</label> 
+        {type === 'checkbox' ? ( 
+          <input 
+            type="checkbox" 
+            id={key} 
+            name={key} 
+            checked={!!formData[key]} 
+            onChange={handleInputChange} 
+            className="h-4 w-4 text-gold border-border rounded focus:ring-gold"
+          /> 
+        ) : type === 'textarea' ? ( 
+          <textarea 
+            name={key} 
+            id={key} 
+            value={value} 
+            onChange={handleInputChange} 
+            rows={3} 
+            className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold" 
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+          /> 
+        ) : ( 
+          <input 
+            type={type} 
+            name={key} 
+            id={key} 
+            value={value} 
+            onChange={handleInputChange} 
+            className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold" 
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+          /> 
+        )} 
+      </div> 
+    );
   };
 
   // --- RENDER LOGIC ---
-  if (isLoadingTemplates && !isCustomTemplateFlow && !searchParams.get('template')) { return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-gold" /> <p className="ml-4">Loading Templates...</p></div>; }
-  if (errorLoadingTemplates) { return <div className="p-4 text-red-600">Error: {errorLoadingTemplates}</div>; }
-  if (!templateCategoriesData && !isCustomTemplateFlow && currentStep === 1 && !selectedCategoryId && !currentAction) { return <div className="p-4">No templates configured.</div>; }
+  if (isLoadingTemplates && !isEffectivelyCustom && !searchParams.get('template')) { 
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-gold" /> 
+        <p className="ml-4">Loading Templates...</p>
+      </div>
+    ); 
+  }
+  
+  if (errorLoadingTemplates) { 
+    return <div className="p-4 text-red-600">Error: {errorLoadingTemplates}</div>; 
+  }
+  
+  if (!templateCategoriesData && !isEffectivelyCustom && currentStep === 1 && !selectedCategoryId && !currentAction) { 
+    return <div className="p-4">No templates configured.</div>; 
+  }
 
   // Step 1: Template Selection
   if (currentStep === 1) {
@@ -429,14 +658,14 @@ const CreateReportPage: React.FC = () => {
                           </div>
                       )}
                   </div>
-              ) : !selectedCategoryId ? ( // Show Categories
+              ) : !selectedCategoryId ? (
                   <>
                       <h2 className="text-xl font-medium mb-6 text-center">Choose a Report Category</h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {templateCategoriesData.map((category: TemplateCategory) => { // Typed category
+                          {templateCategoriesData.map((category: TemplateCategory) => {
                               const IconComponent = category.icon_name ? iconMap[category.icon_name] || FileTextIcon : FileTextIcon;
                               return (
-                              <button key={category.id} onClick={() => { setSelectedCategoryId(category.category_id); clearDraft(getDraftKey(null, category.category_id, null)); setSelectedTemplateId(null);}} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
+                              <button key={category.id} onClick={() => { setSelectedCategoryId(category.category_id); clearDraft(getDraftKey(null, category.category_id, false)); setSelectedTemplateId(null);}} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
                                   <div className="flex items-center gap-3 mb-2"><IconComponent className="text-gold group-hover:scale-105 transition-transform" size={24} /> <h3 className="font-semibold text-md text-text-primary">{category.category_name}</h3></div>
                                   <p className="text-xs text-text-secondary mb-3">{category.category_description}</p>
                                   <div className="mt-auto text-gold text-xs font-medium">View Templates <ArrowRight className="inline w-3 h-3 group-hover:translate-x-1 transition-transform" /></div>
@@ -448,12 +677,12 @@ const CreateReportPage: React.FC = () => {
                           <button onClick={() => navigate('/reports', {state: {triggerUploadModal: true}})} className="btn border-border hover:border-gold text-gold">Define Custom Template via Report Drafting Page</button>
                       </div>
                   </>
-              ) : ( // Show Sub-Templates
+              ) : (
                   <>
                       <div className="flex items-center mb-6"><button onClick={() => {setSelectedCategoryId(null); setSelectedTemplateId(null);}} className="btn btn-primary text-sm mr-4"><ArrowLeft size={16} className="inline mr-1"/>Back to Categories</button><h2 className="text-xl font-medium">Choose from: {templateCategoriesData.find(c => c.category_id === selectedCategoryId)?.category_name}</h2></div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {subTemplatesData.filter(st => st.category_table_id === templateCategoriesData.find(c => c.category_id === selectedCategoryId)?.id).map((subTemplate: SubTemplate) => ( // Typed subTemplate
-                              <button key={subTemplate.id} onClick={() => { setSearchParams({ template: subTemplate.sub_template_id }); /* Let useEffect handle other state updates */ }} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
+                          {subTemplatesData.filter(st => st.category_table_id === templateCategoriesData.find(c => c.category_id === selectedCategoryId)?.id).map((subTemplate: SubTemplate) => (
+                              <button key={subTemplate.id} onClick={() => { setSearchParams({ template: subTemplate.sub_template_id }); }} className="text-left p-4 border border-border rounded-lg hover:border-gold hover:shadow-md transition-all group bg-bg-primary">
                                   <h4 className="font-semibold text-md text-text-primary mb-1">{subTemplate.name}</h4><p className="text-xs text-text-secondary line-clamp-2">{subTemplate.description}</p>
                                   <div className="mt-3 text-gold text-xs font-medium">Use Template <ArrowRight className="inline w-3 h-3" /></div>
                               </button>
@@ -467,11 +696,11 @@ const CreateReportPage: React.FC = () => {
   }
 
   // Step 2: Data Input Form
-  if (currentStep === 2 && (selectedTemplateId || isCustomTemplateFlow)) {
+  if (currentStep === 2 && (selectedTemplateId || isEffectivelyCustom)) {
     let currentFormTitle = "Report Details";
     let placeholdersForCurrentForm: string[] = [];
 
-    if (isCustomTemplateFlow && activeCustomPlaceholders) {
+    if (isEffectivelyCustom && activeCustomPlaceholders) {
         currentFormTitle = activeCustomName || "Custom Report";
         placeholdersForCurrentForm = activeCustomPlaceholders;
     } else if (selectedTemplateId && templateCategoriesData) {
@@ -482,7 +711,7 @@ const CreateReportPage: React.FC = () => {
         }
     }
 
-    if (selectedTemplateId === 'academic-wjiv') {
+    if (selectedTemplateId === 'academic-achievement') {
       return (
         <div className="animate-fadeIn">
           <div className="flex items-center gap-4 mb-6">
@@ -502,7 +731,7 @@ const CreateReportPage: React.FC = () => {
           </div>
         </div>
       );
-    } else { // Dynamic form for other predefined or custom
+    } else {
       return (
         <div className="animate-fadeIn">
           <div className="flex items-center gap-4 mb-6"><button onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSelectedFile(null); setSearchParams({});}} className="btn border border-border hover:bg-bg-secondary flex items-center gap-2"><ArrowLeft size={16}/>Back to Templates</button><h1 className="text-2xl font-medium">Fill: {currentFormTitle}</h1></div>
@@ -514,7 +743,7 @@ const CreateReportPage: React.FC = () => {
                 const type = key.includes('DATE') || key.includes('DOB') ? 'date' : (key.includes('SS') || key.includes('PR') || key.includes('SCORE')) ? 'number' : 'textarea';
                 return renderFormField(camelKey, label, type as any, `Enter ${label}`);
               })
-              : <div className="text-center py-8"><FileTextIcon className="text-text-secondary opacity-50 mx-auto mb-3" size={36} /><p className="text-text-secondary">{isCustomTemplateFlow ? "This custom template has no defined fields to fill." : "No specific fields defined for this template."} You can proceed to review.</p></div>
+              : <div className="text-center py-8"><FileTextIcon className="text-text-secondary opacity-50 mx-auto mb-3" size={36} /><p className="text-text-secondary">{isEffectivelyCustom ? "This custom template has no defined fields to fill." : "No specific fields defined for this template."} You can proceed to review.</p></div>
             }
           </div>
           <div className="flex justify-between items-center mt-8 pt-6 border-t border-border"><button onClick={() => {setCurrentStep(1); setSelectedTemplateId(null); setSelectedCategoryId(null); setSelectedFile(null); setSearchParams({});}} className="btn border-border">Back</button><button onClick={generateReport} className="btn bg-accent-gold text-black">Generate & Review Report</button></div>
@@ -639,7 +868,7 @@ const CreateReportPage: React.FC = () => {
       </div>
       
       <div className="card text-center py-12">
-        <FileText className="text-text-secondary mx-auto mb-4" size={64} />
+        <FileTextIcon className="text-text-secondary mx-auto mb-4" size={64} />
         <h2 className="text-xl font-medium mb-4">Something went wrong</h2>
         <p className="text-text-secondary mb-6">Please try again or go back to reports.</p>
         <Link to="/reports" className="btn bg-accent-gold text-black">
