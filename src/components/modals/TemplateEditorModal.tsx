@@ -40,6 +40,7 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
   const [isDefinePlaceholderModalOpen, setIsDefinePlaceholderModalOpen] = useState(false);
   const [currentPlaceholderName, setCurrentPlaceholderName] = useState('');
   const quillRef = useRef<ReactQuill>(null);
+  const placeholderNameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,6 +55,16 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
       }
     }
   }, [isOpen, initialContentHtml, initialName, availableCategories]);
+
+  // Auto-focus the placeholder input when the sub-modal opens
+  useEffect(() => {
+    if (isDefinePlaceholderModalOpen && placeholderNameInputRef.current) {
+      // Timeout helps ensure the element is fully rendered and focusable
+      setTimeout(() => {
+        placeholderNameInputRef.current?.focus();
+      }, 100); // Small delay
+    }
+  }, [isDefinePlaceholderModalOpen]);
 
   if (!isOpen) {
     return null;
@@ -228,6 +239,7 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
               <div>
                 <label htmlFor="placeholderNameInput" className="block text-sm font-medium mb-1">Placeholder Display Name:</label>
                 <input 
+                  ref={placeholderNameInputRef}
                   type="text" 
                   id="placeholderNameInput"
                   className="w-full p-2 border border-border rounded-md bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-gold"
