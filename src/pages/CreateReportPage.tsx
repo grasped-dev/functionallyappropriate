@@ -1239,7 +1239,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 } else {
                   // Predefined templates (Markdown-like)
                   const htmlPreview = markdownToBasicHtml(populatedText);
-                  return <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
+                  return <div className="prose prose-sm dark:prose-invert max-w-none\" dangerouslySetInnerHTML={{ __html: htmlPreview }} />;
                 }
               } else {
                 return (
