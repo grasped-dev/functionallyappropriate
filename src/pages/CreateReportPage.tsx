@@ -417,7 +417,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   const currentAction = searchParams.get('action');
   
   // Draft key generation
-  const getDraftKey = useCallback((): string => {
+  const getDraftKey = React.useCallback((): string => {
     if (selectedTemplateId) return `${DRAFT_KEY_PREFIX}${selectedTemplateId}`;
     if (currentAction === 'upload') return `${DRAFT_KEY_PREFIX}action_upload`;
     if (selectedCategoryId) return `${DRAFT_KEY_PREFIX}category_${selectedCategoryId}`;
@@ -1405,5 +1405,3 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
 };
 
 export default CreateReportPage;
-
-export default CreateReportPage
