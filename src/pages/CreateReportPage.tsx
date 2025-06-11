@@ -132,6 +132,63 @@ interface SubTemplate {
   created_at: string | null;
 }
 
+// Draft management interfaces and constants
+const DRAFT_KEY_PREFIX = 'createReport_draft_';
+const DRAFT_EXPIRY_HOURS = 24;
+
+interface DraftData {
+  formData: FormData;
+  selectedTemplateId: string | null;
+  currentStep: number;
+  currentSubStep: number;
+  selectedCategoryId?: string | null;
+  
+  // Fields for custom template specifics
+  isCustomFlag?: boolean;
+  customTemplateName?: string;
+  customTemplateContent?: string;
+  customTemplatePlaceholders?: string[];
+  
+  timestamp: number;
+}
+
+// Draft utility functions
+const saveDraft = (key: string, data: DraftData) => {
+  try {
+    localStorage.setItem(key, JSON.stringify({ ...data, timestamp: Date.now() }));
+  } catch (error) {
+    console.warn('Failed to save draft:', error);
+  }
+};
+
+const loadDraft = (key: string): DraftData | null => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+    
+    const draft = JSON.parse(stored) as DraftData;
+    const hoursOld = (Date.now() - draft.timestamp) / (1000 * 60 * 60);
+    
+    if (hoursOld > DRAFT_EXPIRY_HOURS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return draft;
+  } catch (error) {
+    console.warn('Failed to load draft:', error);
+    return null;
+  }
+};
+
+const clearDraft = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn('Failed to clear draft:', error);
+  }
+};
+
 const CreateReportPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -147,6 +204,11 @@ const CreateReportPage: React.FC = () => {
   const [generatedReport, setGeneratedReport] = useState<string>('');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  
+  // Custom template state for draft handling
+  const [draftedCustomContent, setDraftedCustomContent] = useState<string | undefined>(undefined);
+  const [draftedCustomPlaceholders, setDraftedCustomPlaceholders] = useState<string[] | undefined>(undefined);
+  const [draftedCustomName, setDraftedCustomName] = useState<string | undefined>(undefined);
   
   // Icon mapping for template categories
   const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -345,8 +407,22 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
 
   const [isLoadingTemplates] = useState(false);
   const routeState = location.state;
-  const isCustomTemplateFlow = routeState?.customTemplateContent;
+  
+  // Enhanced custom template handling
+  const activeCustomContent = routeState?.customTemplateContent || draftedCustomContent;
+  const activeCustomPlaceholders = routeState?.customTemplatePlaceholders || draftedCustomPlaceholders;
+  const activeCustomName = routeState?.customTemplateName || draftedCustomName;
+  const isCustomTemplateFlow = selectedTemplateId?.startsWith('custom-') || !!activeCustomContent;
+  
   const currentAction = searchParams.get('action');
+  
+  // Draft key generation
+  const getDraftKey = useCallback((): string => {
+    if (selectedTemplateId) return `${DRAFT_KEY_PREFIX}${selectedTemplateId}`;
+    if (currentAction === 'upload') return `${DRAFT_KEY_PREFIX}action_upload`;
+    if (selectedCategoryId) return `${DRAFT_KEY_PREFIX}category_${selectedCategoryId}`;
+    return `${DRAFT_KEY_PREFIX}general_create`;
+  }, [selectedTemplateId, selectedCategoryId, currentAction]);
 
   // Dropzone configuration for file upload
   const onDrop = React.useCallback((acceptedFiles: File[]) => {
@@ -372,6 +448,35 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
   // Initialize from URL params or route state
   useEffect(() => {
     if (isLoadingTemplates) return;
+    
+    // Check for existing draft first
+    const draftKey = getDraftKey();
+    const loadedDraft = loadDraft(draftKey);
+    
+    if (loadedDraft && !routeState?.customTemplateContent) {
+      if (window.confirm('Resume saved draft?')) {
+        setFormData(loadedDraft.formData);
+        setCurrentStep(loadedDraft.currentStep);
+        setCurrentSubStep(loadedDraft.currentSubStep || 1);
+        setSelectedCategoryId(loadedDraft.selectedCategoryId || null);
+        setSelectedTemplateId(loadedDraft.selectedTemplateId || null);
+        
+        if (loadedDraft.isCustomFlag) {
+          setDraftedCustomName(loadedDraft.customTemplateName);
+          setDraftedCustomContent(loadedDraft.customTemplateContent);
+          setDraftedCustomPlaceholders(loadedDraft.customTemplatePlaceholders);
+        }
+        
+        // Ensure URL reflects template ID if draft is loaded
+        if (loadedDraft.selectedTemplateId && loadedDraft.selectedTemplateId !== searchParams.get('template')) {
+          setSearchParams({ template: loadedDraft.selectedTemplateId }, { replace: true });
+        }
+        
+        return; // Exit early to use draft data
+      } else {
+        clearDraft(draftKey);
+      }
+    }
 
     const templateParam = searchParams.get('template');
     
@@ -380,7 +485,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
       setSelectedTemplateId('custom');
       setSelectedCategoryId('custom');
       
-      const customPlaceholders = routeState?.customTemplatePlaceholders || [];
+      const customPlaceholders = activeCustomPlaceholders || [];
       const initialCustomFormData: FormData = {
         studentName: '',
         dob: '',
@@ -446,7 +551,36 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
         }
       }
     }
-  }, [searchParams, routeState, templateCategories, isLoadingTemplates, isCustomTemplateFlow]);
+  }, [searchParams, routeState, templateCategories, isLoadingTemplates, isCustomTemplateFlow, getDraftKey, activeCustomPlaceholders]);
+  
+  // Auto-save draft effect
+  useEffect(() => {
+    if (currentStep === 1) return; // Don't save drafts on step 1
+    
+    const draftKey = getDraftKey();
+    const draftToSave: DraftData = {
+      formData,
+      selectedTemplateId,
+      currentStep,
+      currentSubStep,
+      selectedCategoryId,
+      timestamp: Date.now()
+    };
+    
+    if (isCustomTemplateFlow) {
+      draftToSave.isCustomFlag = true;
+      draftToSave.customTemplateName = activeCustomName;
+      draftToSave.customTemplateContent = activeCustomContent;
+      draftToSave.customTemplatePlaceholders = activeCustomPlaceholders;
+    }
+    
+    // Debounce the save operation
+    const timeoutId = setTimeout(() => {
+      saveDraft(draftKey, draftToSave);
+    }, 1000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [formData, selectedTemplateId, currentStep, currentSubStep, selectedCategoryId, isCustomTemplateFlow, activeCustomName, activeCustomContent, activeCustomPlaceholders, getDraftKey]);
 
   // Utility functions for template processing
   const toUpperSnakeCase = (camelCase: string): string => {
@@ -609,7 +743,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
     let template = '';
     
     if (isCustomTemplateFlow) {
-      template = routeState?.customTemplateContent || '';
+      template = activeCustomContent || '';
     } else {
       const category = templateCategories.find(c => c.category_id === selectedCategoryId);
       if (category) {
@@ -620,12 +754,18 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
       }
     }
     
-    const report = populateTemplate(template, formData);
+    const report = isCustomTemplateFlow 
+      ? populateTemplate(template, formData, activeCustomPlaceholders)
+      : populateTemplate(template, formData);
     setGeneratedReport(report);
     setCurrentStep(3);
   };
 
   const handleSaveReport = () => {
+    // Clear draft when saving final report
+    const draftKey = getDraftKey();
+    clearDraft(draftKey);
+    
     const reportName = formData.studentName ? 
       `${formData.studentName} - ${getSelectedTemplateName()}` : 
       `New Report - ${getSelectedTemplateName()}`;
@@ -645,7 +785,7 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
 
   const getSelectedTemplateName = (): string => {
     if (isCustomTemplateFlow) {
-      return routeState?.customTemplateName || 'Custom Template';
+      return activeCustomName || 'Custom Template';
     }
     
     const category = templateCategories.find(c => c.category_id === selectedCategoryId);
@@ -1066,9 +1206,9 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
         currentFormTitle = `Uploaded File: ${selectedFile.name}`;
         // Placeholder for file parsing - in real implementation, you'd parse the file here
         currentPlaceholders = ['STUDENT_NAME', 'DOB', 'DOE', 'GRADE', 'EXAMINER'];
-      } else if (isCustomTemplateFlow && routeState?.customTemplatePlaceholders) {
-        currentFormTitle = routeState.customTemplateName || "Custom Report";
-        currentPlaceholders = routeState.customTemplatePlaceholders;
+      } else if (isCustomTemplateFlow && activeCustomPlaceholders) {
+        currentFormTitle = activeCustomName || "Custom Report";
+        currentPlaceholders = activeCustomPlaceholders;
       } else if (selectedTemplateId) {
         const foundSubTemplate = subTemplates.find((st: SubTemplate) => st.sub_template_id === selectedTemplateId);
         if (foundSubTemplate) {
@@ -1200,8 +1340,8 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               if (selectedFile) {
                 // Placeholder for uploaded file template content
                 contentToUse = `# UPLOADED TEMPLATE REPORT\n\n## Student Information\nName: [STUDENT_NAME]\nDate of Birth: [DOB]\n\n## Assessment Results\n[This would be populated from the uploaded template file]`;
-              } else if (isCustomTemplateFlow && routeState?.customTemplateContent) {
-                contentToUse = routeState.customTemplateContent;
+              } else if (isCustomTemplateFlow && activeCustomContent) {
+                contentToUse = activeCustomContent;
               } else if (selectedTemplateId && templateCategories) {
                 const category = templateCategories.find(c => 
                   subTemplates.some(st => st.category_table_id === c.id && st.sub_template_id === selectedTemplateId)
@@ -1216,7 +1356,9 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                 return <p className="text-text-secondary italic">No template content available for preview.</p>;
               }
 
-              const populatedText = populateTemplate(contentToUse, formData);
+              const populatedText = isCustomTemplateFlow 
+                ? populateTemplate(contentToUse, formData, activeCustomPlaceholders)
+                : populateTemplate(contentToUse, formData);
 
               if (isPreviewMode) {
                 if (isCustomTemplateFlow) {
@@ -1228,8 +1370,27 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               } else {
                 return (
                   <textarea
-                    value={populatedText}
-                    onChange={(e) => setGeneratedReport(e.target.value)}
+                    value={generatedReport || populatedText}
+                    onChange={(e) => {
+                      setGeneratedReport(e.target.value);
+                      // Auto-save when editing
+                      const draftKey = getDraftKey();
+                      const draftToSave: DraftData = {
+                        formData,
+                        selectedTemplateId,
+                        currentStep,
+                        currentSubStep,
+                        selectedCategoryId,
+                        timestamp: Date.now()
+                      };
+                      if (isCustomTemplateFlow) {
+                        draftToSave.isCustomFlag = true;
+                        draftToSave.customTemplateName = activeCustomName;
+                        draftToSave.customTemplateContent = activeCustomContent;
+                        draftToSave.customTemplatePlaceholders = activeCustomPlaceholders;
+                      }
+                      setTimeout(() => saveDraft(draftKey, draftToSave), 500);
+                    }}
                     className="w-full h-96 p-4 border border-border rounded-md bg-bg-primary focus:outline-none focus:ring-2 focus:ring-gold font-mono text-sm resize-none"
                     placeholder="Generated report will appear here..."
                   />
