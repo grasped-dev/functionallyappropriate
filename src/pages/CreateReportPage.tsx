@@ -1028,8 +1028,9 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
                     setSelectedTemplateId(null);
                     setSearchParams({});
                   } else {
+                    // Smart back navigation - skip extended battery step if it wasn't included
                     if (currentSubStep === 5 && !formData.includeExtendedBattery) {
-                      setCurrentSubStep(3);
+                      setCurrentSubStep(4); // Go back to subtests step, not clusters
                     } else {
                       setCurrentSubStep(prev => Math.max(1, prev - 1));
                     }
@@ -1041,9 +1042,8 @@ Wechsler Intelligence Scale for Children - Fifth Edition (WISC-V)
               </button>
               <button 
                 onClick={() => {
-                  if (currentSubStep === 3 && !formData.includeExtendedBattery) {
-                    setCurrentSubStep(5);
-                  } else if (currentSubStep < wjivSubStepsConfig.length) { 
+                  // Always go to next step normally - don't skip step 4
+                  if (currentSubStep < wjivSubStepsConfig.length) { 
                     setCurrentSubStep(prev => prev + 1);
                   } else {
                     generateReport();
