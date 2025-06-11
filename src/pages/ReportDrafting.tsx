@@ -7,6 +7,12 @@ import mammoth from 'mammoth';
 import TemplateEditorModal from '../components/modals/TemplateEditorModal';
 
 // Interface for template objects
+interface TemplateCategory {
+  id: string;
+  name: string;
+}
+
+// Interface for template objects
 interface AppTemplate {
   id: string;
   name: string;
@@ -21,6 +27,17 @@ const ReportDrafting: React.FC = () => {
   
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  
+  // Mock categories based on the database schema
+  const availableCategories: TemplateCategory[] = [
+    { id: '1', name: 'Academic Reports' },
+    { id: '2', name: 'Behavioral Reports' },
+    { id: '3', name: 'Speech & Language Reports' },
+    { id: '4', name: 'Cognitive Assessments' },
+    { id: '5', name: 'Progress Reports' },
+    { id: '6', name: 'Custom Templates' }
+  ];
+  
   const [isTemplateEditorModalOpen, setIsTemplateEditorModalOpen] = useState(false);
   const [newTemplateInitialContent, setNewTemplateInitialContent] = useState(''); // Will store HTML
   const [newTemplateInitialName, setNewTemplateInitialName] = useState('');
@@ -226,7 +243,7 @@ const ReportDrafting: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSaveCustomTemplate = (name: string, contentHtml: string, placeholderKeys: string[]) => {
+  const handleSaveCustomTemplate = (name: string, contentHtml: string, placeholderKeys: string[], categoryId: string) => {
     const newCustomTemplate: AppTemplate = {
       id: `custom-${Date.now()}-${name.replace(/\s+/g, '_')}`, // More unique ID
       name: name,
@@ -473,6 +490,7 @@ const ReportDrafting: React.FC = () => {
         initialContentHtml={newTemplateInitialContent}
         initialName={newTemplateInitialName}
         onSave={handleSaveCustomTemplate}
+        availableCategories={availableCategories}
       />
     </div>
   );
