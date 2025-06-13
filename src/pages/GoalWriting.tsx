@@ -20,16 +20,121 @@ interface WizardStep {
   description: string;
   icon: React.ReactNode;
 }
+ <div className="space-y-6"> {/* Main container for the step's content */}
+    
+    {/* Student Name */}
+    <div>
+      <label htmlFor="studentName" className="block text-sm font-medium mb-1 text-text-primary">
+        Student Name:
+      </label>
+      <input
+        type="text"
+        id="studentName"
+        value={wizardData.studentName}
+        onChange={(e) => setWizardData({ ...wizardData, studentName: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+        placeholder="Enter student's full name"
+      />
+    </div>
 
-interface WizardData {
-  // Step 1: Student Demographics
-  studentName: string;
-  currentGradeLevel: string; // e.g., 'K', '1', '2', ...
-  schoolName: string;
-  primaryDisability: string;
-  secondaryDisability: string;
-  studentInterestsGeneralInfo: string; // Was studentDisposition
-  englishLearnerStatus: 'ELL' | 'EO' | 'RFEP' | ''; // English Language Learner, English Only, Redesignated Fluent English Proficient
+    {/* Current Grade Level - Dropdown */}
+    <div>
+      <label htmlFor="currentGradeLevel" className="block text-sm font-medium mb-1 text-text-primary">
+        Current Grade Level:
+      </label>
+      <select
+        id="currentGradeLevel"
+        value={wizardData.currentGradeLevel}
+        onChange={(e) => setWizardData({ ...wizardData, currentGradeLevel: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+      >
+        {/* Ensure gradeOptions is defined: const gradeOptions = ['K', '1', '2', '3', '4', '5']; */}
+        {gradeOptions.map(grade => (
+          <option key={grade} value={grade}>{grade}</option>
+        ))}
+      </select>
+    </div>
+
+    {/* School Name */}
+    <div>
+      <label htmlFor="schoolName" className="block text-sm font-medium mb-1 text-text-primary">
+        School Name (optional):
+      </label>
+      <input
+        type="text"
+        id="schoolName"
+        value={wizardData.schoolName}
+        onChange={(e) => setWizardData({ ...wizardData, schoolName: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+        placeholder="Enter school name"
+      />
+    </div>
+
+    {/* Primary Disability - Free Enter Space */}
+    <div>
+      <label htmlFor="primaryDisability" className="block text-sm font-medium mb-1 text-text-primary">
+        Primary Disability:
+      </label>
+      <input
+        type="text"
+        id="primaryDisability"
+        value={wizardData.primaryDisability}
+        onChange={(e) => setWizardData({ ...wizardData, primaryDisability: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+        placeholder="e.g., Autism, Specific Learning Disability"
+      />
+    </div>
+
+    {/* Secondary Disability - Free Enter Space */}
+    <div>
+      <label htmlFor="secondaryDisability" className="block text-sm font-medium mb-1 text-text-primary">
+        Secondary Disability (optional):
+      </label>
+      <input
+        type="text"
+        id="secondaryDisability"
+        value={wizardData.secondaryDisability}
+        onChange={(e) => setWizardData({ ...wizardData, secondaryDisability: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+        placeholder="Enter secondary disability if applicable"
+      />
+    </div>
+    
+    {/* English Learner Status - Dropdown */}
+    <div>
+      <label htmlFor="englishLearnerStatus" className="block text-sm font-medium mb-1 text-text-primary">
+        English Learner Status:
+      </label>
+      <select
+        id="englishLearnerStatus"
+        value={wizardData.englishLearnerStatus}
+        onChange={(e) => setWizardData({ ...wizardData, englishLearnerStatus: e.target.value as WizardData['englishLearnerStatus'] })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors"
+      >
+        <option value="">Select Status</option>
+        <option value="ELL">English Language Learner (ELL)</option>
+        <option value="EO">English Only (EO)</option>
+        <option value="RFEP">Redesignated Fluent English Proficient (RFEP)</option>
+      </select>
+    </div>
+
+    {/* Student interests and general information - Textarea */}
+    <div>
+      <label htmlFor="studentInterestsGeneralInfo" className="block text-sm font-medium mb-1 text-text-primary">
+        Student Interests and General Information:
+      </label>
+      <textarea
+        id="studentInterestsGeneralInfo"
+        value={wizardData.studentInterestsGeneralInfo}
+        onChange={(e) => setWizardData({ ...wizardData, studentInterestsGeneralInfo: e.target.value })}
+        className="w-full p-3 border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-green transition-colors h-32" // Adjusted height
+        placeholder="Describe student's interests, hobbies, strengths, learning preferences, and any other general information helpful for understanding the student..."
+      />
+    </div>
+
+  </div> // Closing main div for the step's content
+);
+
 
   // Step 2: Previous IEP Goals
   previousGoalDomain: string; // e.g., 'Operations & Algebraic Thinking'
