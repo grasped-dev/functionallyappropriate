@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Target, Plus, Save, Trash2, ArrowRight, ArrowLeft, Check, Sparkles, Brain, FileText, Calendar, Lightbulb } from 'lucide-react';
+import {
+  User, BookOpen, BarChart2, Edit3, Microscope, Settings, ShieldCheck, FileText as IEPFileTextIcon, Target as GoalTargetIcon, Handshake, Lightbulb, Brain, Sparkles, Check, ArrowLeft, ArrowRight, Calendar, Plus, Save, Trash2 // Add more as needed
+} from 'lucide-react';
+
 
 interface Goal {
   id: number;
@@ -8,34 +11,181 @@ interface Goal {
   baseline: string;
   targetDate: string;
   status: 'draft' | 'active' | 'completed';
+  studentName?: string; // Make studentName optional if not every goal object will have it immediately
 }
 
-interface WizardStep {
-  id: number;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
+interface WizardData {
+  // Step 1: Student Demographics
+  studentName: string;
+  currentGradeLevel: string; // e.g., 'K', '1', '2', ...
+  schoolName: string;
+  primaryDisability: string;
+  secondaryDisability: string;
+  studentInterestsGeneralInfo: string; // Was studentDisposition
+  englishLearnerStatus: 'ELL' | 'EO' | 'RFEP' | ''; // English Language Learner, English Only, Redesignated Fluent English Proficient
+
+  // Step 2: Previous IEP Goals
+  previousGoalDomain: string; // e.g., 'Operations & Algebraic Thinking'
+  previousGoalStandardId: string; // e.g., 'K.OA.A.2'
+  previousGoalAnnualGoalText: string;
+  previousGoalProgressStatus: 'met' | 'not_met' | 'partially_met' | 'minimal_progress' | 'objectives_met' | 'not_annual_goal' | '';
+  previousGoalContinuedNeed: 'yes' | 'no' | '';
+  showPreviousObjectives: boolean; // To toggle visibility
+  previousObjective1Text: string;
+  previousObjective1Status: 'met' | 'not_met' | 'partially_met' | '';
+  previousObjective2Text: string;
+  previousObjective2Status: 'met' | 'not_met' | 'partially_met' | '';
+  previousObjective3Text: string;
+  previousObjective3Status: 'met' | 'not_met' | 'partially_met' | '';
+
+  // Step 3: Student Context & Supports
+  // studentInterestsGeneralInfo is already defined in Step 1, can be displayed here too
+  anecdotalObservationsGE: string; // Progress/performance in GE, CCSS, access
+  academicStrengthsGeneralInfo: string;
+  areasOfGrowthQualitative: string;
+  // individualizedSupports: string; // Covered in Step 6 more specifically
+
+  // Step 4: Student Data (Existing & Baseline Planning)
+  benchmarkAssessmentType: 'NWEA' | 'Curriculum-Based' | 'Benchmark' | 'Other' | '';
+  benchmarkAssessmentOtherName: string; // If 'Other' is selected
+  benchmarkDataManualInput: string; // Or specific fields below
+  // NWEA Specific
+  nweaRitScore: string;
+  nweaPercentilePeers: string;
+  nweaGrowthPercentile: string;
+  // File upload placeholder - actual file handling state will be separate
+  // assessmentFileUploadPlaceholder: any; // Not used directly in wizardData for now
+
+  // Statewide Assessments
+  statewideAssessmentType: 'SBAC' | 'CAA' | '';
+  statewideAssessmentScores: string; // Placeholder for now
+
+  // ELPAC Scores (conditional on englishLearnerStatus)
+  elpacScores: string;
+
+  // AI Recommended Baseline Area (text description for now)
+  // aiRecommendedBaselineAreas: string; // This will be an output from AI, not input here
+
+  // Step 5: New Baseline Data Analysis
+  // assessmentFileUploadPlaceholderForNewBaseline: any; // Placeholder
+  newBaselineDomain: string;
+  newBaselineStandardId: string;
+  newBaselineResultsQuantitative: string; // e.g., "4 out of 5..."
+  newBaselineAdditionalInfoQualitative: string;
+  newBaselineSupportsToIncreaseAccess: string;
+
+  // Step 6: Student Accommodations and Supports
+  accommodations: string[]; // Store selected accommodations (e.g., ['visual_schedule', 'manipulatives'])
+  modifications: string[];  // Store selected modifications
+  behaviorNeeds: 'yes' | 'no' | '';
+  behaviorSupports: string[]; // Store selected behavior supports
+  elSupports: string; // Free text for EL specific supports
+
+  // Step 7: Special Factors
+  assistiveTechNeeded: 'yes' | 'no' | '';
+  assistiveTechRationale: string;
+  blindVisualImpairment: 'yes' | 'no' | '';
+  deafHardOfHearing: 'yes' | 'no' | '';
+  behaviorImpedingLearning: 'yes' | 'no' | '';
+  behaviorInterventionsStrategies: string;
+
+  // Step 8: Present Levels (This will be drafted by AI, then editable by teacher)
+  draftPresentLevels: string;
+
+  // Step 9: Goal Proposal (AI drafts, teacher edits)
+  draftAnnualGoal: string;
+  draftObjective1: string;
+  draftObjective2: string;
+  draftObjective3: string;
+
+  // Step 10: Related Services
+  // This might be an array of service objects for more complex scenarios
+  // For now, a simple structure for one service, or plan for an array
+  relatedServiceType: 'SAI' | 'BIS' | 'Other' | ''; // Specialized Academic Instruction, Behavior Intervention Services
+  relatedServiceOtherName: string;
+  relatedServiceDuration: string; // e.g., "250 minutes"
+  relatedServiceFrequency: 'weekly' | 'monthly' | 'daily' | '';
+  relatedServiceDelivery: 'individual' | 'group' | '';
+  relatedServiceLocation: string;
+  relatedServiceComments: string;
+  relatedServiceStartDate: string; // Date string
+  relatedServiceEndDate: string;   // Date string
 }
 
 const GoalWriting: React.FC = () => {
-  const [goals, setGoals] = useState<Goal[]>([
-    {
-      id: 1,
-      area: 'Reading Comprehension',
-      description: 'Student will identify the main idea and three supporting details in grade-level text with 80% accuracy in 3 out of 4 trials.',
-      baseline: 'Currently identifies main idea with 40% accuracy',
-      targetDate: '2025-06-15',
-      status: 'active',
-    },
-    {
-      id: 2,
-      area: 'Social Skills',
-      description: 'Student will initiate appropriate peer interactions during unstructured activities at least 4 times per day for 4 consecutive weeks.',
-      baseline: 'Currently initiates interactions 1-2 times per day',
-      targetDate: '2025-05-30',
-      status: 'active',
-    },
-  ]);
+const [wizardData, setWizardData] = useState<WizardData>({
+  // Initialize ALL fields from the WizardData interface
+  studentName: '',
+  currentGradeLevel: 'K',
+  schoolName: '',
+  primaryDisability: '',
+  secondaryDisability: '',
+  studentInterestsGeneralInfo: '',
+  englishLearnerStatus: '',
+
+  previousGoalDomain: '',
+  previousGoalStandardId: '',
+  previousGoalAnnualGoalText: '',
+  previousGoalProgressStatus: '',
+  previousGoalContinuedNeed: '',
+  showPreviousObjectives: false,
+  previousObjective1Text: '',
+  previousObjective1Status: '',
+  previousObjective2Text: '',
+  previousObjective2Status: '',
+  previousObjective3Text: '',
+  previousObjective3Status: '',
+
+  anecdotalObservationsGE: '',
+  academicStrengthsGeneralInfo: '',
+  areasOfGrowthQualitative: '',
+
+  benchmarkAssessmentType: '',
+  benchmarkAssessmentOtherName: '',
+  benchmarkDataManualInput: '',
+  nweaRitScore: '',
+  nweaPercentilePeers: '',
+  nweaGrowthPercentile: '',
+  statewideAssessmentType: '',
+  statewideAssessmentScores: '',
+  elpacScores: '',
+
+  newBaselineDomain: '',
+  newBaselineStandardId: '',
+  newBaselineResultsQuantitative: '',
+  newBaselineAdditionalInfoQualitative: '',
+  newBaselineSupportsToIncreaseAccess: '',
+
+  accommodations: [],
+  modifications: [],
+  behaviorNeeds: '',
+  behaviorSupports: [],
+  elSupports: '',
+
+  assistiveTechNeeded: '',
+  assistiveTechRationale: '',
+  blindVisualImpairment: '',
+  deafHardOfHearing: '',
+  behaviorImpedingLearning: '',
+  behaviorInterventionsStrategies: '',
+
+  draftPresentLevels: '',
+  draftAnnualGoal: '',
+  draftObjective1: '',
+  draftObjective2: '',
+  draftObjective3: '',
+
+  relatedServiceType: '',
+  relatedServiceOtherName: '',
+  relatedServiceDuration: '',
+  relatedServiceFrequency: '',
+  relatedServiceDelivery: '',
+  relatedServiceLocation: '',
+  relatedServiceComments: '',
+  relatedServiceStartDate: '',
+  relatedServiceEndDate: '',
+});
+
 
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -66,32 +216,68 @@ const GoalWriting: React.FC = () => {
     criteria: '',
   });
 
-  const wizardSteps: WizardStep[] = [
-    {
-      id: 0,
-      title: 'Student Information',
-      description: 'Provide general student details, math observations, previous goal progress, and any existing assessment data.',
-      icon: <Target className="text-green" size={24} />,
-    },
-    {
-      id: 1,
-      title: 'Assessment Data',
-      description: 'Share relevant assessment results and observations',
-      icon: <Brain className="text-green" size={24} />,
-    },
-    {
-      id: 2,
-      title: 'Goal Parameters',
-      description: 'Define the specific area and target behavior',
-      icon: <FileText className="text-green" size={24} />,
-    },
-    {
-      id: 3,
-      title: 'Success Criteria',
-      description: 'Set measurable criteria and timeline',
-      icon: <Calendar className="text-green" size={24} />,
-    },
-  ];
+ const wizardSteps: WizardStep[] = [ // Uses your existing WizardStep interface
+  {
+    id: 0, // Corresponds to currentStep === 0
+    title: 'Student Demographics',
+    description: 'Basic information about the student.',
+    icon: <User className="text-green" size={24} />,
+  },
+  {
+    id: 1, // Corresponds to currentStep === 1
+    title: 'Previous IEP Goals Review',
+    description: 'Review progress on prior goals to inform new ones.',
+    icon: <BookOpen className="text-green" size={24} />,
+  },
+  {
+    id: 2, // Corresponds to currentStep === 2
+    title: 'Student Context & Supports',
+    description: 'Gather qualitative information about the student.',
+    icon: <Settings className="text-green" size={24} />, // Or Lightbulb
+  },
+  {
+    id: 3, // Corresponds to currentStep === 3
+    title: 'Existing Student Data Input',
+    description: 'Input data from benchmark, statewide, and other assessments.',
+    icon: <BarChart2 className="text-green" size={24} />,
+  },
+  {
+    id: 4, // Corresponds to currentStep === 4
+    title: 'New Baseline Data & Analysis',
+    description: 'Input results from newly administered baseline assessments.',
+    icon: <Microscope className="text-green" size={24} />,
+  },
+  {
+    id: 5, // Corresponds to currentStep === 5
+    title: 'Accommodations & Modifications',
+    description: 'Define supports for the student.',
+    icon: <ShieldCheck className="text-green" size={24} />,
+  },
+  {
+    id: 6, // Corresponds to currentStep === 6
+    title: 'Special Factors',
+    description: 'Address specific considerations for the student.',
+    icon: <Edit3 className="text-green" size={24} />, // Or an AlertTriangle icon
+  },
+  {
+    id: 7, // Corresponds to currentStep === 7
+    title: 'Draft Present Levels of Performance',
+    description: 'AI will help synthesize data into a PLOP draft.',
+    icon: <IEPFileTextIcon className="text-green" size={24} />, // Renamed FileText to avoid conflict
+  },
+  {
+    id: 8, // Corresponds to currentStep === 8
+    title: 'Propose IEP Goals & Objectives',
+    description: 'AI will recommend goals based on data and desired growth.',
+    icon: <GoalTargetIcon className="text-green" size={24} />, // Renamed Target to avoid conflict
+  },
+  {
+    id: 9, // Corresponds to currentStep === 9
+    title: 'Related Services',
+    description: 'Document any related services the student receives.',
+    icon: <Handshake className="text-green" size={24} />,
+  },
+];
 
   const goalAreas = [
     'Reading Comprehension',
@@ -108,36 +294,92 @@ const GoalWriting: React.FC = () => {
 
   const gradeOptions = ['K', '1st', '2nd', '3rd', '4th', '5th'];
 
-  const handleStartWizard = () => {
-    setShowWizard(true);
-    setCurrentStep(0);
-    setWizardData({
-      // General Student Information
-      studentName: '',
-      gradeLevel: 'K',
-      schoolName: '',
-      disabilityCategory: '',
-      studentDisposition: '',
-      mathObservations: '',
-      // Previous IEP Goal in Math
-      previousGoalText: '',
-      previousGoalCriteria: '',
-      previousGoalProgress: '',
-      previousGoalStrategies: '',
-      
-      // Existing Assessment Data
-      broadAssessmentSummary: '',
-      specificAssessmentNotes: '',
-      
-      // Legacy fields for other steps
-      assessmentData: '',
-      goalArea: '',
-      currentPerformance: '',
-      targetBehavior: '',
-      timeframe: '',
-      criteria: '',
-    });
-  };
+ const handleStartWizard = () => {
+  setShowWizard(true);
+  setCurrentStep(0);
+  setWizardData({ // Resetting wizardData to its initial state
+    // Step 1: Student Demographics
+    studentName: '',
+    currentGradeLevel: 'K',
+    schoolName: '',
+    primaryDisability: '',
+    secondaryDisability: '',
+    studentInterestsGeneralInfo: '',
+    englishLearnerStatus: '',
+
+    // Step 2: Previous IEP Goals
+    previousGoalDomain: '',
+    previousGoalStandardId: '',
+    previousGoalAnnualGoalText: '',
+    previousGoalProgressStatus: '',
+    previousGoalContinuedNeed: '',
+    showPreviousObjectives: false,
+    previousObjective1Text: '',
+    previousObjective1Status: '',
+    previousObjective2Text: '',
+    previousObjective2Status: '',
+    previousObjective3Text: '',
+    previousObjective3Status: '',
+
+    // Step 3: Student Context & Supports
+    anecdotalObservationsGE: '',
+    academicStrengthsGeneralInfo: '',
+    areasOfGrowthQualitative: '',
+
+    // Step 4: Student Data (Existing & Baseline Planning)
+    benchmarkAssessmentType: '',
+    benchmarkAssessmentOtherName: '',
+    benchmarkDataManualInput: '',
+    nweaRitScore: '',
+    nweaPercentilePeers: '',
+    nweaGrowthPercentile: '',
+    statewideAssessmentType: '',
+    statewideAssessmentScores: '',
+    elpacScores: '',
+
+    // Step 5: New Baseline Data Analysis
+    newBaselineDomain: '',
+    newBaselineStandardId: '',
+    newBaselineResultsQuantitative: '',
+    newBaselineAdditionalInfoQualitative: '',
+    newBaselineSupportsToIncreaseAccess: '',
+
+    // Step 6: Student Accommodations and Supports
+    accommodations: [],
+    modifications: [],
+    behaviorNeeds: '',
+    behaviorSupports: [],
+    elSupports: '',
+
+    // Step 7: Special Factors
+    assistiveTechNeeded: '',
+    assistiveTechRationale: '',
+    blindVisualImpairment: '',
+    deafHardOfHearing: '',
+    behaviorImpedingLearning: '',
+    behaviorInterventionsStrategies: '',
+
+    // Step 8: Present Levels
+    draftPresentLevels: '',
+
+    // Step 9: Goal Proposal
+    draftAnnualGoal: '',
+    draftObjective1: '',
+    draftObjective2: '',
+    draftObjective3: '',
+
+    // Step 10: Related Services
+    relatedServiceType: '',
+    relatedServiceOtherName: '',
+    relatedServiceDuration: '',
+    relatedServiceFrequency: '',
+    relatedServiceDelivery: '',
+    relatedServiceLocation: '',
+    relatedServiceComments: '',
+    relatedServiceStartDate: '',
+    relatedServiceEndDate: '',
+  });
+};
 
   const handleNextStep = () => {
     if (currentStep < wizardSteps.length - 1) {
