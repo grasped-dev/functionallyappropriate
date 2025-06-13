@@ -14,6 +14,13 @@ interface Goal {
   studentName?: string; // Make studentName optional if not every goal object will have it immediately
 }
 
+interface WizardStep {
+  id: number;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
 interface WizardData {
   // Step 1: Student Demographics
   studentName: string;
@@ -110,104 +117,123 @@ interface WizardData {
   relatedServiceComments: string;
   relatedServiceStartDate: string; // Date string
   relatedServiceEndDate: string;   // Date string
+
+  // Legacy fields for compatibility
+  gradeLevel: string;
+  disabilityCategory: string;
+  studentDisposition: string;
+  mathObservations: string;
+  previousGoalText: string;
+  previousGoalCriteria: string;
+  previousGoalProgress: string;
+  previousGoalStrategies: string;
+  broadAssessmentSummary: string;
+  specificAssessmentNotes: string;
+  assessmentData: string;
+  goalArea: string;
+  currentPerformance: string;
+  targetBehavior: string;
+  timeframe: string;
+  criteria: string;
 }
 
 const GoalWriting: React.FC = () => {
-const [wizardData, setWizardData] = useState<WizardData>({
-  // Initialize ALL fields from the WizardData interface
-  studentName: '',
-  currentGradeLevel: 'K',
-  schoolName: '',
-  primaryDisability: '',
-  secondaryDisability: '',
-  studentInterestsGeneralInfo: '',
-  englishLearnerStatus: '',
-
-  previousGoalDomain: '',
-  previousGoalStandardId: '',
-  previousGoalAnnualGoalText: '',
-  previousGoalProgressStatus: '',
-  previousGoalContinuedNeed: '',
-  showPreviousObjectives: false,
-  previousObjective1Text: '',
-  previousObjective1Status: '',
-  previousObjective2Text: '',
-  previousObjective2Status: '',
-  previousObjective3Text: '',
-  previousObjective3Status: '',
-
-  anecdotalObservationsGE: '',
-  academicStrengthsGeneralInfo: '',
-  areasOfGrowthQualitative: '',
-
-  benchmarkAssessmentType: '',
-  benchmarkAssessmentOtherName: '',
-  benchmarkDataManualInput: '',
-  nweaRitScore: '',
-  nweaPercentilePeers: '',
-  nweaGrowthPercentile: '',
-  statewideAssessmentType: '',
-  statewideAssessmentScores: '',
-  elpacScores: '',
-
-  newBaselineDomain: '',
-  newBaselineStandardId: '',
-  newBaselineResultsQuantitative: '',
-  newBaselineAdditionalInfoQualitative: '',
-  newBaselineSupportsToIncreaseAccess: '',
-
-  accommodations: [],
-  modifications: [],
-  behaviorNeeds: '',
-  behaviorSupports: [],
-  elSupports: '',
-
-  assistiveTechNeeded: '',
-  assistiveTechRationale: '',
-  blindVisualImpairment: '',
-  deafHardOfHearing: '',
-  behaviorImpedingLearning: '',
-  behaviorInterventionsStrategies: '',
-
-  draftPresentLevels: '',
-  draftAnnualGoal: '',
-  draftObjective1: '',
-  draftObjective2: '',
-  draftObjective3: '',
-
-  relatedServiceType: '',
-  relatedServiceOtherName: '',
-  relatedServiceDuration: '',
-  relatedServiceFrequency: '',
-  relatedServiceDelivery: '',
-  relatedServiceLocation: '',
-  relatedServiceComments: '',
-  relatedServiceStartDate: '',
-  relatedServiceEndDate: '',
-});
-
-
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [wizardData, setWizardData] = useState({
-    // General Student Information
+  const [wizardData, setWizardData] = useState<WizardData>({
+    // Step 1: Student Demographics
     studentName: '',
-    gradeLevel: 'K',
+    currentGradeLevel: 'K',
     schoolName: '',
+    primaryDisability: '',
+    secondaryDisability: '',
+    studentInterestsGeneralInfo: '',
+    englishLearnerStatus: '',
+
+    // Step 2: Previous IEP Goals
+    previousGoalDomain: '',
+    previousGoalStandardId: '',
+    previousGoalAnnualGoalText: '',
+    previousGoalProgressStatus: '',
+    previousGoalContinuedNeed: '',
+    showPreviousObjectives: false,
+    previousObjective1Text: '',
+    previousObjective1Status: '',
+    previousObjective2Text: '',
+    previousObjective2Status: '',
+    previousObjective3Text: '',
+    previousObjective3Status: '',
+
+    // Step 3: Student Context & Supports
+    anecdotalObservationsGE: '',
+    academicStrengthsGeneralInfo: '',
+    areasOfGrowthQualitative: '',
+
+    // Step 4: Student Data (Existing & Baseline Planning)
+    benchmarkAssessmentType: '',
+    benchmarkAssessmentOtherName: '',
+    benchmarkDataManualInput: '',
+    nweaRitScore: '',
+    nweaPercentilePeers: '',
+    nweaGrowthPercentile: '',
+    statewideAssessmentType: '',
+    statewideAssessmentScores: '',
+    elpacScores: '',
+
+    // Step 5: New Baseline Data Analysis
+    newBaselineDomain: '',
+    newBaselineStandardId: '',
+    newBaselineResultsQuantitative: '',
+    newBaselineAdditionalInfoQualitative: '',
+    newBaselineSupportsToIncreaseAccess: '',
+
+    // Step 6: Student Accommodations and Supports
+    accommodations: [],
+    modifications: [],
+    behaviorNeeds: '',
+    behaviorSupports: [],
+    elSupports: '',
+
+    // Step 7: Special Factors
+    assistiveTechNeeded: '',
+    assistiveTechRationale: '',
+    blindVisualImpairment: '',
+    deafHardOfHearing: '',
+    behaviorImpedingLearning: '',
+    behaviorInterventionsStrategies: '',
+
+    // Step 8: Present Levels
+    draftPresentLevels: '',
+
+    // Step 9: Goal Proposal
+    draftAnnualGoal: '',
+    draftObjective1: '',
+    draftObjective2: '',
+    draftObjective3: '',
+
+    // Step 10: Related Services
+    relatedServiceType: '',
+    relatedServiceOtherName: '',
+    relatedServiceDuration: '',
+    relatedServiceFrequency: '',
+    relatedServiceDelivery: '',
+    relatedServiceLocation: '',
+    relatedServiceComments: '',
+    relatedServiceStartDate: '',
+    relatedServiceEndDate: '',
+
+    // Legacy fields for compatibility
+    gradeLevel: 'K',
     disabilityCategory: '',
     studentDisposition: '',
     mathObservations: '',
-    // Previous IEP Goal in Math
     previousGoalText: '',
     previousGoalCriteria: '',
     previousGoalProgress: '',
     previousGoalStrategies: '',
-
-    // Existing Assessment Data
     broadAssessmentSummary: '',
     specificAssessmentNotes: '',
-
-    // Legacy fields for other steps
     assessmentData: '',
     goalArea: '',
     currentPerformance: '',
@@ -378,6 +404,24 @@ const [wizardData, setWizardData] = useState<WizardData>({
     relatedServiceComments: '',
     relatedServiceStartDate: '',
     relatedServiceEndDate: '',
+
+    // Legacy fields for compatibility
+    gradeLevel: 'K',
+    disabilityCategory: '',
+    studentDisposition: '',
+    mathObservations: '',
+    previousGoalText: '',
+    previousGoalCriteria: '',
+    previousGoalProgress: '',
+    previousGoalStrategies: '',
+    broadAssessmentSummary: '',
+    specificAssessmentNotes: '',
+    assessmentData: '',
+    goalArea: '',
+    currentPerformance: '',
+    targetBehavior: '',
+    timeframe: '',
+    criteria: '',
   });
 };
 
