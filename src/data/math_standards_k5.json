@@ -1,0 +1,43 @@
+[
+  {
+    "id": "K.CC.B.4",
+    "grade": "K",
+    "domain": "Counting & Cardinality",
+    "cluster": "B",
+    "standard_detail": "Understand the relationship between numbers and quantities; connect counting to cardinality",
+    "prerequisites": [],
+    "leadsTo": ["1.OA.C.6", "1.NBT.C.4"],
+    "priority": 1
+  },
+  {
+    "id": "K.OA.A.2",
+    "grade": "K",
+    "domain": "Operations and Algebraic Thinking",
+    "cluster": "A",
+    "standard_detail": "Solve addition and subtraction word problems, and add and subtract within 10, e.g., by using objects or drawings to represent the problem",
+    "prerequisites": ["K.CC.B.4", "K.OA.A.1"],
+    "leadsTo": ["1.OA.A.1", "1.OA.C.6"],
+    "priority": 2
+  },
+  {
+    "id": "K.OA.A.5",
+    "grade": "K",
+    "domain": "Operations and Algebraic Thinking",
+    "cluster": "A",
+    "standard_detail": "Fluently add and subtract within 5",
+    "prerequisites": ["K.OA.A.2", "K.OA.A.3"],
+    "leadsTo": ["1.OA.C.6", "1.NBT.C.4"],
+    "priority": 3
+  },
+  {
+    "id": "1.OA.A.1",
+    "grade": "1",
+    "domain": "Operations and Algebraic Thinking",
+    "cluster": "A",
+    "standard_detail": "Use addition and subtraction within 20 to solve word problems involving situations of adding to, taking from, putting together, taking apart, and comparing, with unknowns in all positions, e.g., by using objects, drawings, and equations with a symbol for the unknown number to represent the problem.",
+    "prerequisites": ["K.OA.A.1", "K.OA.A.2"],
+    "leadsTo": ["1.OA.A.2", "2.OA.A.1"],
+    "priority": 2
+  }
+
+
