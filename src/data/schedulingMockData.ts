@@ -1,3 +1,6 @@
+// src/data/schedulingMockData.ts
+
+// Blueprints for our team members
 export interface TeamMember {
   id: string;
   name: string;

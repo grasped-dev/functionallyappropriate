@@ -8,7 +8,6 @@ import CreateReportPage from './pages/CreateReportPage';
 import StudentDashboard from './pages/StudentDashboard';
 import MyMeetingsPage from './pages/MyMeetingsPage';
 import InboxPage from './pages/InboxPage';
-import StudentServiceSchedulePage from './pages/StudentServiceSchedulePage';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -23,7 +22,6 @@ function App() {
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="my-meetings" element={<MyMeetingsPage />} />
         <Route path="inbox" element={<InboxPage />} />
-        <Route path="student-service-schedule/:studentId" element={<StudentServiceSchedulePage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

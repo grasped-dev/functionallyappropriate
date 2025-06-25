@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Calendar, Target, FileText, BarChart3 } from 'lucide-react';
+import { Calendar, Target, FileText, BarChart3, Users, Bell } from 'lucide-react';
 
 const MobileNav: React.FC = () => {
   const navItems = [
@@ -8,6 +8,8 @@ const MobileNav: React.FC = () => {
     { path: '/goals', label: 'Goals', icon: <Target size={20} />, accent: 'green' },
     { path: '/reports', label: 'Reports', icon: <FileText size={20} />, accent: 'gold' },
     { path: '/dashboard', label: 'Dashboard', icon: <BarChart3 size={20} />, accent: 'purple' },
+    { path: '/my-meetings', label: 'Meetings', icon: <Users size={20} />, accent: 'blue' },
+    { path: '/inbox', label: 'Inbox', icon: <Bell size={20} />, accent: 'orange' },
   ];
 
   return (
@@ -19,7 +21,7 @@ const MobileNav: React.FC = () => {
             to={item.path}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center w-full h-full transition-colors ${
-                isActive ? `text-${item.accent}` : 'text-text-secondary'
+                isActive ? `text-${item.accent === 'orange' ? 'orange-500' : item.accent}` : 'text-text-secondary'
               }`
             }
             end
