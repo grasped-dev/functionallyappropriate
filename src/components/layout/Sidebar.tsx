@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Calendar, Target, FileText, BarChart3 } from 'lucide-react';
+import { Calendar, Target, FileText, BarChart3, Users, Bell } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,10 +8,12 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
   const navItems = [
-    { path: '/scheduling', label: 'Scheduling', icon: <Calendar className="text-teal\" size={20} />, accent: 'teal' },
+    { path: '/scheduling', label: 'Scheduling', icon: <Calendar className="text-teal" size={20} />, accent: 'teal' },
     { path: '/goals', label: 'Goal Writing', icon: <Target className="text-green" size={20} />, accent: 'green' },
-    { path: '/reports', label: 'Report Drafting', icon: <FileText className="text-gold\" size={20} />, accent: 'gold' },
+    { path: '/reports', label: 'Report Drafting', icon: <FileText className="text-gold" size={20} />, accent: 'gold' },
     { path: '/dashboard', label: 'Student Dashboard', icon: <BarChart3 className="text-purple" size={20} />, accent: 'purple' },
+    { path: '/my-meetings', label: 'My Meetings', icon: <Users className="text-blue-500" size={20} />, accent: 'blue' },
+    { path: '/inbox', label: 'Inbox', icon: <Bell className="text-orange-500" size={20} />, accent: 'orange' },
   ];
 
   return (
