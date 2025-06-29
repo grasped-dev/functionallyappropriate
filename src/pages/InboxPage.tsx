@@ -216,23 +216,18 @@ const InboxPage: React.FC = () => {
     return stats;
   };
 
-  // STANDARDIZED: ViewMeetingDetailsModal handlers using the same pattern as MyMeetingsPage
-  const executeProposalWorkflow = (meeting: IEPMeeting, source: string) => {
-    console.log(`[InboxPage] ${source}: User clicked Propose New Time for:`, meeting);
+  // Handle propose new time
+  const handleProposeNewTime = (meeting: IEPMeeting) => {
+    console.log('[InboxPage] User clicked Propose New Time for:', meeting);
     
-    // Step 1: Update RSVP status to indicate they're proposing a new time
-    console.log(`[InboxPage] ${source}: Step 1 - Updating RSVP status`);
+    // Update RSVP status to indicate they're proposing a new time
     updateMeetingRSVP(meeting.id, currentUserId, 'ProposedNewTime', 'User is selecting an alternative time...');
     
-    // Step 2: Set the meeting context for proposing alternative
-    console.log(`[InboxPage] ${source}: Step 2 - Setting meetingToProposeAlternativeFor context state to:`, meeting);
+    // Set the meeting context for proposing alternative
     setMeetingToProposeAlternativeFor(meeting);
     
-    // Step 3: Navigate to scheduling page with small delay to ensure context is set
-    setTimeout(() => {
-      console.log(`[InboxPage] ${source}: Step 3 - Navigating to /scheduling for proposal mode`);
-      navigate('/scheduling');
-    }, 100);
+    // Navigate to scheduling page
+    navigate('/scheduling');
   };
 
   const handleEditFromModal = (meeting: IEPMeeting) => {
@@ -259,7 +254,18 @@ const InboxPage: React.FC = () => {
   };
 
   const handleProposeFromModal = (meeting: IEPMeeting) => {
-    executeProposalWorkflow(meeting, 'INBOX_MODAL_BUTTON');
+    console.log('[InboxPage] User clicked Propose New Time from modal for:', meeting);
+    
+    // Update RSVP status to indicate they're proposing a new time
+    updateMeetingRSVP(meeting.id, currentUserId, 'ProposedNewTime', 'User is selecting an alternative time...');
+    
+    // Set the meeting context for proposing alternative
+    setMeetingToProposeAlternativeFor(meeting);
+    
+    // Navigate to scheduling page
+    setTimeout(() => {
+      navigate('/scheduling');
+    }, 50);
   };
 
   const stats = getNotificationStats();
