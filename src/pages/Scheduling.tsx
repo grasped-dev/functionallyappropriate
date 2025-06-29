@@ -8,10 +8,12 @@ import ViewMeetingDetailsModal from '../components/scheduling/ViewMeetingDetails
 import { IEPMeeting, mockTeamMembers, AlternativeTimeProposal } from '../data/schedulingMockData';
 import { calculateTeamAvailability, AvailableSlot } from '../utils/scheduleCalculator';
 import { useMeetings } from '../context/MeetingsContext';
+import { useNavigate } from 'react-router-dom';
 
 type ViewMode = 'initial' | 'availability';
 
 const Scheduling: React.FC = () => {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isNewMeetingModalOpen, setIsNewMeetingModalOpen] = useState(false);
   const { 
@@ -391,8 +393,24 @@ const Scheduling: React.FC = () => {
     updateMeetingRSVP(meetingId, currentUserId, 'Declined');
   };
 
+  // FIXED: Corrected handleProposeFromModal function to match the behavior in MyMeetingsPage
   const handleProposeFromModal = (meeting: IEPMeeting) => {
-    updateMeetingRSVP(meeting.id, currentUserId, 'ProposedNewTime', 'Requested alternative time');
+    // Log for debugging
+    console.log('[SchedulingPage] "Propose New Time" initiated from Upcoming Events for meeting:', meeting);
+
+    // Step 1: Update the user's RSVP status for the original meeting
+    updateMeetingRSVP(meeting.id, currentUserId, 'ProposedNewTime', 'User is selecting an alternative time...');
+    console.log('[SchedulingPage] RSVP status updated to ProposedNewTime.');
+
+    // Step 2: Set the global context state to signal "proposing mode"
+    setMeetingToProposeAlternativeFor(meeting);
+    console.log('[SchedulingPage] meetingToProposeAlternativeFor context is now SET.');
+
+    // Step 3: Navigate to the scheduling page to trigger the availability view
+    // Even though we are already on /scheduling, this re-triggers the component load
+    // and allows the useEffect to process the new context state.
+    navigate('/scheduling');
+    console.log('[SchedulingPage] Navigation to /scheduling initiated to refresh view.');
   };
 
   const getTeamMemberNames = (teamMemberIds: string[]) => {
